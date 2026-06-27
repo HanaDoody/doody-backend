@@ -52,6 +52,28 @@ public class ReportSummary {
     @Column(name = "generated_at", nullable = false)
     private LocalDateTime generatedAt;
 
+    public static ReportSummary create(
+        User user,
+        String period,
+        LocalDate periodStart,
+        LocalDate periodEnd,
+        String stats,
+        String summary,
+        String highlights,
+        LocalDateTime generatedAt
+    ) {
+        ReportSummary reportSummary = new ReportSummary();
+        reportSummary.user = user;
+        reportSummary.period = period;
+        reportSummary.periodStart = periodStart;
+        reportSummary.periodEnd = periodEnd;
+        reportSummary.stats = stats;
+        reportSummary.summary = summary;
+        reportSummary.highlights = highlights;
+        reportSummary.generatedAt = generatedAt;
+        return reportSummary;
+    }
+
     @PrePersist
     void prePersist() {
         if (this.generatedAt == null) {
