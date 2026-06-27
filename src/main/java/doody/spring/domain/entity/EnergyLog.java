@@ -44,6 +44,15 @@ public class EnergyLog {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    public static EnergyLog create(User user, LocalDate energyDate, Short energy, RhythmLog rhythmLog) {
+        EnergyLog energyLog = new EnergyLog();
+        energyLog.user = user;
+        energyLog.energyDate = energyDate;
+        energyLog.energy = energy;
+        energyLog.rhythmLog = rhythmLog;
+        return energyLog;
+    }
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();

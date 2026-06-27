@@ -56,6 +56,26 @@ public class DoodyCollection {
     @Column(name = "collected_at", nullable = false)
     private LocalDateTime collectedAt;
 
+    public static DoodyCollection create(
+        User user,
+        DoodyTemplate doodyTemplate,
+        String tier,
+        String axis,
+        String earnedReason,
+        String source,
+        Long sourceId
+    ) {
+        DoodyCollection collection = new DoodyCollection();
+        collection.user = user;
+        collection.doodyTemplate = doodyTemplate;
+        collection.tier = tier;
+        collection.axis = axis;
+        collection.earnedReason = earnedReason;
+        collection.source = source;
+        collection.sourceId = sourceId;
+        return collection;
+    }
+
     @PrePersist
     void prePersist() {
         if (this.collectedAt == null) {
