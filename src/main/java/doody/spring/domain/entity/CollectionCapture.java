@@ -1,0 +1,62 @@
+package doody.spring.domain.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@Entity
+@Table(name = "collection_captures")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class CollectionCapture {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "capture_id")
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "pin_id", nullable = false, length = 100)
+    private String pinId;
+
+    @Column(precision = 9, scale = 6)
+    private BigDecimal lat;
+
+    @Column(precision = 9, scale = 6)
+    private BigDecimal lng;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "dudy_id", nullable = false)
+    private DoodyTemplate doodyTemplate;
+
+    @Column(nullable = false)
+    private Integer reward = 0;
+
+    @Column(name = "captured_at", nullable = false)
+    private LocalDateTime capturedAt;
+
+    @PrePersist
+    void prePersist() {
+        if (this.reward == null) {
+            this.reward = 0;
+        }
+        if (this.capturedAt == null) {
+            this.capturedAt = LocalDateTime.now();
+        }
+    }
+}
