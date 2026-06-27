@@ -5,6 +5,7 @@ import doody.spring.auth.dto.LoginResponse;
 import doody.spring.auth.dto.SignupRequest;
 import doody.spring.auth.dto.SignupResponse;
 import doody.spring.auth.service.AuthService;
+import doody.spring.common.dto.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,12 +25,12 @@ public class AuthController {
 
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
-    public SignupResponse signup(@RequestBody SignupRequest request) {
-        return authService.signup(request);
+    public ApiResponse<SignupResponse> signup(@RequestBody SignupRequest request) {
+        return ApiResponse.success(HttpStatus.CREATED, "signup success.", authService.signup(request));
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest request) {
-        return authService.login(request);
+    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {
+        return ApiResponse.success(HttpStatus.OK, "login success.", authService.login(request));
     }
 }
