@@ -1,5 +1,8 @@
 package doody.spring.domain.entity;
 
+import doody.spring.domain.type.GapAxis;
+import doody.spring.domain.type.GoalChoice;
+import doody.spring.domain.type.RecommendedPeriod;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -31,13 +34,13 @@ public class OnboardingResponse {
     private User user;
 
     @Column(name = "gap_axis", length = 20)
-    private String gapAxis;
+    private GapAxis gapAxis;
 
     @Column(name = "goal_choice", length = 64)
-    private String goalChoice;
+    private GoalChoice goalChoice;
 
     @Column(name = "recommended_period", length = 10)
-    private String recommendedPeriod;
+    private RecommendedPeriod recommendedPeriod;
 
     @Column(name = "rhythm_choice")
     private Integer rhythmChoice;
@@ -50,6 +53,26 @@ public class OnboardingResponse {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    public static OnboardingResponse create(
+        User user,
+        GapAxis gapAxis,
+        GoalChoice goalChoice,
+        RecommendedPeriod recommendedPeriod,
+        Integer rhythmChoice,
+        Integer autonomyChoice,
+        Integer connectionChoice
+    ) {
+        OnboardingResponse response = new OnboardingResponse();
+        response.user = user;
+        response.gapAxis = gapAxis;
+        response.goalChoice = goalChoice;
+        response.recommendedPeriod = recommendedPeriod;
+        response.rhythmChoice = rhythmChoice;
+        response.autonomyChoice = autonomyChoice;
+        response.connectionChoice = connectionChoice;
+        return response;
+    }
 
     @PrePersist
     void prePersist() {

@@ -7,6 +7,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,10 +22,10 @@ public class User {
     @Column(name = "user_id", length = 64)
     private String id;
 
-    @Column(unique = true, length = 255)
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(length = 50)
+    @Column(nullable = false, length = 50)
     private String nickname;
 
     @Column(name = "is_mydata_linked", nullable = false)
@@ -35,6 +36,15 @@ public class User {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public static User create(String email, String nickname, Boolean mydataLinked) {
+        User user = new User();
+        user.id = UUID.randomUUID().toString();
+        user.email = email;
+        user.nickname = nickname;
+        user.mydataLinked = mydataLinked != null && mydataLinked;
+        return user;
+    }
 
     @PrePersist
     void prePersist() {
