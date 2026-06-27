@@ -1,5 +1,6 @@
 package doody.spring.domain.entity;
 
+import doody.spring.domain.type.RecommendedPeriod;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -45,7 +46,10 @@ public class Goal {
     private String connectionGoal;
 
     @Column(length = 10)
-    private String period;
+    private RecommendedPeriod period;
+
+    @Column(name = "first_step_mission", columnDefinition = "TEXT")
+    private String firstStepMission;
 
     @Column(precision = 4, scale = 3)
     private BigDecimal rhythm;
@@ -61,6 +65,25 @@ public class Goal {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    public static Goal create(
+        User user,
+        String title,
+        String autonomyGoal,
+        String connectionGoal,
+        RecommendedPeriod period,
+        String firstStepMission
+    ) {
+        Goal goal = new Goal();
+        goal.user = user;
+        goal.title = title;
+        goal.autonomyGoal = autonomyGoal;
+        goal.connectionGoal = connectionGoal;
+        goal.period = period;
+        goal.firstStepMission = firstStepMission;
+        goal.active = true;
+        return goal;
+    }
 
     @PrePersist
     void prePersist() {

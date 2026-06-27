@@ -13,6 +13,9 @@ public record SignupRequest(
     Integer rhythmChoice,
     Integer autonomyChoice,
     Integer connectionChoice,
-    Boolean isMydataLinked
+    Boolean isMydataLinked,
+    String autonomyGoal,
+    String connectionGoal,
+    String firstStepMission
 ) {
 }

@@ -2,8 +2,10 @@ package doody.spring.auth.service;
 
 import doody.spring.auth.dto.SignupRequest;
 import doody.spring.auth.dto.SignupResponse;
+import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.OnboardingResponse;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.OnboardingResponseRepository;
 import doody.spring.domain.repository.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -16,13 +18,16 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final OnboardingResponseRepository onboardingResponseRepository;
+    private final GoalRepository goalRepository;
 
     public AuthService(
         UserRepository userRepository,
-        OnboardingResponseRepository onboardingResponseRepository
+        OnboardingResponseRepository onboardingResponseRepository,
+        GoalRepository goalRepository
     ) {
         this.userRepository = userRepository;
         this.onboardingResponseRepository = onboardingResponseRepository;
+        this.goalRepository = goalRepository;
     }
 
     @Transactional
@@ -30,7 +35,7 @@ public class AuthService {
         validateSignupRequest(request);
 
         if (userRepository.existsByEmail(request.email())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "?대? 媛?낅맂 ?대찓?쇱엯?덈떎.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "email already exists.");
         }
 
         User user = userRepository.save(User.create(
@@ -51,24 +56,42 @@ public class AuthService {
             )
         );
 
-        return SignupResponse.from(user, onboardingResponse);
+        Goal goal = goalRepository.save(Goal.create(
+            user,
+            request.gapAxis().getValue(),
+            request.autonomyGoal(),
+            request.connectionGoal(),
+            request.recommendedPeriod(),
+            request.firstStepMission()
+        ));
+
+        return SignupResponse.from(user, onboardingResponse, goal);
     }
 
     private void validateSignupRequest(SignupRequest request) {
         if (request.email() == null || request.email().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email? ?꾩닔?낅땲??");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email is required.");
         }
         if (request.nickname() == null || request.nickname().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nickname? ?꾩닔?낅땲??");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nickname is required.");
         }
         if (request.gapAxis() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "gapAxis???꾩닔?낅땲??");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "gapAxis is required.");
         }
         if (request.goalChoice() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "goalChoice???꾩닔?낅땲??");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "goalChoice is required.");
         }
         if (request.recommendedPeriod() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "recommendedPeriod???꾩닔?낅땲??");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "recommendedPeriod is required.");
+        }
+        if (request.autonomyGoal() == null || request.autonomyGoal().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "autonomyGoal is required.");
+        }
+        if (request.connectionGoal() == null || request.connectionGoal().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "connectionGoal is required.");
+        }
+        if (request.firstStepMission() == null || request.firstStepMission().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "firstStepMission is required.");
         }
     }
 }
