@@ -1,5 +1,7 @@
 package doody.spring.auth.service;
 
+import doody.spring.auth.dto.LoginRequest;
+import doody.spring.auth.dto.LoginResponse;
 import doody.spring.auth.dto.SignupRequest;
 import doody.spring.auth.dto.SignupResponse;
 import doody.spring.domain.entity.Goal;
@@ -68,6 +70,16 @@ public class AuthService {
         return SignupResponse.from(user, onboardingResponse, goal);
     }
 
+    @Transactional(readOnly = true)
+    public LoginResponse login(LoginRequest request) {
+        validateLoginRequest(request);
+
+        User user = userRepository.findByEmailAndNickname(request.email(), request.nickname())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "email or nickname is invalid."));
+
+        return LoginResponse.from(user);
+    }
+
     private void validateSignupRequest(SignupRequest request) {
         if (request.email() == null || request.email().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email is required.");
@@ -92,6 +104,15 @@ public class AuthService {
         }
         if (request.firstStepMission() == null || request.firstStepMission().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "firstStepMission is required.");
+        }
+    }
+
+    private void validateLoginRequest(LoginRequest request) {
+        if (request.email() == null || request.email().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email is required.");
+        }
+        if (request.nickname() == null || request.nickname().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nickname is required.");
         }
     }
 }

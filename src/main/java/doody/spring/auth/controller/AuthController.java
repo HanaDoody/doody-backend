@@ -1,5 +1,7 @@
 package doody.spring.auth.controller;
 
+import doody.spring.auth.dto.LoginRequest;
+import doody.spring.auth.dto.LoginResponse;
 import doody.spring.auth.dto.SignupRequest;
 import doody.spring.auth.dto.SignupResponse;
 import doody.spring.auth.service.AuthService;
@@ -24,5 +26,10 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public SignupResponse signup(@RequestBody SignupRequest request) {
         return authService.signup(request);
+    }
+
+    @PostMapping("/login")
+    public LoginResponse login(@RequestBody LoginRequest request) {
+        return authService.login(request);
     }
 }
