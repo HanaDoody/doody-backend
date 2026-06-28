@@ -5,6 +5,7 @@ import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.MissionLog;
 import doody.spring.domain.entity.MissionTemplate;
 import doody.spring.domain.entity.RhythmLog;
+import doody.spring.domain.entity.User;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.MissionLogRepository;
@@ -22,6 +23,8 @@ import doody.spring.mission.dto.TodayMissionResponse.AriVector;
 import doody.spring.mission.dto.TodayMissionResponse.Mission;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -58,12 +61,11 @@ public class MissionService {
         this.aiMissionRecommendClient = aiMissionRecommendClient;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public TodayMissionResponse getTodayMission(String userId) {
         validateUserId(userId);
-        if (!userRepository.existsById(userId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found.");
-        }
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found."));
 
         Goal activeGoal = goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId).orElse(null);
         Short energy = energyLogRepository.findTopByUser_IdOrderByCreatedAtDesc(userId)
@@ -81,7 +83,42 @@ public class MissionService {
         );
 
         Mission fallbackMission = fallbackMission();
-        return aiMissionRecommendClient.recommend(request, fallbackMission);
+        TodayMissionResponse response = aiMissionRecommendClient.recommend(request, fallbackMission);
+        saveRecommendedMission(user, response);
+        return response;
+    }
+
+    private void saveRecommendedMission(User user, TodayMissionResponse response) {
+        Mission mission = response == null ? null : response.mission();
+        if (mission == null) {
+            mission = response == null ? null : response.fallback();
+        }
+        if (mission == null) {
+            return;
+        }
+
+        Optional<MissionTemplate> template = resolveMissionTemplate(mission);
+        if (template.isEmpty()) {
+            return;
+        }
+
+        MissionTemplate missionTemplate = template.get();
+        missionLogRepository.findTopByUser_IdAndMissionTemplate_IdOrderByCreatedAtDesc(user.getId(), missionTemplate.getId())
+            .filter(log -> log.getCreatedAt() != null && log.getCreatedAt().toLocalDate().equals(LocalDate.now()))
+            .orElseGet(() -> missionLogRepository.save(MissionLog.recommend(user, missionTemplate)));
+    }
+
+    private Optional<MissionTemplate> resolveMissionTemplate(Mission mission) {
+        if (mission.missionId() != null && !mission.missionId().isBlank()) {
+            Optional<MissionTemplate> template = missionTemplateRepository.findById(mission.missionId());
+            if (template.isPresent()) {
+                return template;
+            }
+        }
+        if (mission.id() != null && !mission.id().isBlank()) {
+            return missionTemplateRepository.findById(mission.id());
+        }
+        return Optional.empty();
     }
 
     private void validateUserId(String userId) {

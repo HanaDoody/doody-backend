@@ -49,6 +49,14 @@ public class MissionLog {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    public static MissionLog recommend(User user, MissionTemplate missionTemplate) {
+        MissionLog log = new MissionLog();
+        log.user = user;
+        log.missionTemplate = missionTemplate;
+        log.actionType = "RECOMMEND";
+        return log;
+    }
+
     public static MissionLog start(User user, MissionTemplate missionTemplate) {
         MissionLog log = new MissionLog();
         log.user = user;
@@ -74,6 +82,13 @@ public class MissionLog {
         log.actionType = "COMPLETE";
         log.completedAt = LocalDateTime.now();
         return log;
+    }
+
+    public void start() {
+        this.actionType = "START";
+        if (this.startedAt == null) {
+            this.startedAt = LocalDateTime.now();
+        }
     }
 
     public void complete() {

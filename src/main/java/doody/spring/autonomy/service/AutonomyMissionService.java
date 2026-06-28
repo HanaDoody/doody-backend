@@ -87,7 +87,7 @@ public class AutonomyMissionService {
             .map(template -> toNode(template, logs, currentStep))
             .toList();
 
-        return new AutonomyPathResponse("?먮┰ON", currentStep, true, nodes);
+        return new AutonomyPathResponse("?癒?뵲ON", currentStep, true, nodes);
     }
 
     @Transactional(readOnly = true)
@@ -104,6 +104,9 @@ public class AutonomyMissionService {
         MissionLog log = missionLogRepository.findTopByUser_IdAndMissionTemplate_IdOrderByCreatedAtDesc(userId, missionId)
             .filter(existing -> existing.getCompletedAt() == null && existing.getSkippedAt() == null)
             .orElseGet(() -> missionLogRepository.save(MissionLog.start(user, mission)));
+        if (!"START".equals(log.getActionType())) {
+            log.start();
+        }
 
         return new AutonomyMissionStartResponse(log.getId(), mission.getId(), log.getActionType(), log.getStartedAt());
     }
