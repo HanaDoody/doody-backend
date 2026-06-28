@@ -20,4 +20,7 @@ public interface MissionLogRepository extends JpaRepository<MissionLog, Long> {
         LocalDateTime startAt,
         LocalDateTime endAt
     );
+
+    @EntityGraph(attributePaths = "missionTemplate")
+    List<MissionLog> findTop20ByUser_IdOrderByCreatedAtDesc(String userId);
 }

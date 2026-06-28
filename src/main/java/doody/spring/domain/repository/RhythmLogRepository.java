@@ -18,4 +18,6 @@ public interface RhythmLogRepository extends JpaRepository<RhythmLog, Long> {
         LocalDateTime startAt,
         LocalDateTime endAt
     );
+
+    List<RhythmLog> findTop20ByUser_IdOrderByTimestampDesc(String userId);
 }
