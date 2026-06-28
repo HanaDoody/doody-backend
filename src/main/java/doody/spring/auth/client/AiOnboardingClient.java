@@ -18,7 +18,7 @@ public class AiOnboardingClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiOnboardingClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiOnboardingClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }

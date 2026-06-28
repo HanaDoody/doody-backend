@@ -15,7 +15,7 @@ public class AiMorningRhythmClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiMorningRhythmClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiMorningRhythmClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }

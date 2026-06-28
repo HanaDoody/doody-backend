@@ -14,7 +14,7 @@ public class AiReportSummaryClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiReportSummaryClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiReportSummaryClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }
@@ -47,7 +47,7 @@ public class AiReportSummaryClient {
     }
 
     private ActivitySummary fallback(ReportSummaryStats stats) {
-        String summary = "This period has " + stats.totalRecords() + " records across "
+       String summary = "This period has " + stats.totalRecords() + " records across "
             + stats.activeDays() + " active days. "
             + "Rhythm " + stats.axisCounts().getOrDefault("rhythm", 0)
             + ", autonomy " + stats.axisCounts().getOrDefault("autonomy", 0)

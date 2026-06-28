@@ -2,6 +2,8 @@ package doody.spring.rhythm.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import doody.spring.rhythm.dto.EveningRhythmResponse.CollectedDudy;
+import doody.spring.rhythm.dto.EveningRhythmResponse.Reward;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -13,12 +15,12 @@ public class AiEveningRhythmClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiEveningRhythmClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiEveningRhythmClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }
 
-    public AiEveningResult leaveNote(String userId, String text) {
+    public AiEveningResult leaveNote(String userId, LocalDateTime timestamp, String text) {
         if (baseUrl.isBlank()) {
             return fallback();
         }
@@ -26,7 +28,7 @@ public class AiEveningRhythmClient {
         try {
             AiEveningResponse response = restClient.post()
                 .uri(baseUrl + "/rhythm/evening")
-                .body(new AiEveningRequest(userId, text))
+                .body(new AiEveningRequest(userId, timestamp, text))
                 .retrieve()
                 .body(AiEveningResponse.class);
 
@@ -75,22 +77,17 @@ public class AiEveningRhythmClient {
     private record AiEveningRequest(
         @JsonProperty("user_id")
         String userId,
+        LocalDateTime timestamp,
         String text
     ) {
     }
 
     private record AiEveningResponse(
-        AiReward reward,
-        Object signals,
+        Reward reward,
         String reply,
+        String signals,
         @JsonProperty("collected_dudy")
         List<AiCollectedDudy> collectedDudy
-    ) {
-    }
-
-    private record AiReward(
-        @JsonProperty("hana_money")
-        Integer hanaMoney
     ) {
     }
 

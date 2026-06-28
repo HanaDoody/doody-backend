@@ -12,7 +12,7 @@ public class AiChatClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiChatClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiChatClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }
