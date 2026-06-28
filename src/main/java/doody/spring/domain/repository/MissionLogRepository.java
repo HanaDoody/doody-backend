@@ -14,4 +14,10 @@ public interface MissionLogRepository extends JpaRepository<MissionLog, Long> {
         LocalDateTime startAt,
         LocalDateTime endAt
     );
+
+    long countByUser_IdAndCompletedAtBetween(
+        String userId,
+        LocalDateTime startAt,
+        LocalDateTime endAt
+    );
 }

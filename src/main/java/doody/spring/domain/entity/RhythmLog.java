@@ -64,6 +64,18 @@ public class RhythmLog {
         return rhythmLog;
     }
 
+    public static RhythmLog createEvening(User user, LocalDateTime timestamp, String text, String signals, Integer reward) {
+        RhythmLog rhythmLog = new RhythmLog();
+        rhythmLog.user = user;
+        rhythmLog.rhythmType = "EVENING";
+        rhythmLog.anchorDate = timestamp.toLocalDate();
+        rhythmLog.timestamp = timestamp;
+        rhythmLog.text = text;
+        rhythmLog.signals = signals;
+        rhythmLog.reward = reward == null ? 0 : reward;
+        return rhythmLog;
+    }
+
     @PrePersist
     void prePersist() {
         LocalDateTime now = LocalDateTime.now();

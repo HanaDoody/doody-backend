@@ -12,4 +12,10 @@ public interface RhythmLogRepository extends JpaRepository<RhythmLog, Long> {
         LocalDateTime startAt,
         LocalDateTime endAt
     );
+
+    long countByUser_IdAndTimestampBetween(
+        String userId,
+        LocalDateTime startAt,
+        LocalDateTime endAt
+    );
 }

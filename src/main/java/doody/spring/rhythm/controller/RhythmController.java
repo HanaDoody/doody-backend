@@ -1,6 +1,8 @@
 package doody.spring.rhythm.controller;
 
 import doody.spring.common.dto.ApiResponse;
+import doody.spring.rhythm.dto.EveningRhythmRequest;
+import doody.spring.rhythm.dto.EveningRhythmResponse;
 import doody.spring.rhythm.dto.MorningRhythmRequest;
 import doody.spring.rhythm.dto.MorningRhythmResponse;
 import doody.spring.rhythm.service.RhythmService;
@@ -23,5 +25,10 @@ public class RhythmController {
     @PostMapping("/morning")
     public ApiResponse<MorningRhythmResponse> checkInMorning(@RequestBody MorningRhythmRequest request) {
         return ApiResponse.success(HttpStatus.OK, "morning rhythm check-in success.", rhythmService.checkInMorning(request));
+    }
+
+    @PostMapping("/evening")
+    public ApiResponse<EveningRhythmResponse> leaveEveningNote(@RequestBody EveningRhythmRequest request) {
+        return ApiResponse.success(HttpStatus.OK, "evening rhythm note success.", rhythmService.leaveEveningNote(request));
     }
 }
