@@ -10,6 +10,8 @@ import doody.spring.domain.entity.User;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.OnboardingResponseRepository;
 import doody.spring.domain.repository.UserRepository;
+import doody.spring.mission.dto.TodayMissionResponse.AriVector;
+import java.math.BigDecimal;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,7 +69,26 @@ public class AuthService {
             request.firstStepMission()
         ));
 
-        return SignupResponse.from(user, onboardingResponse, goal);
+        AriVector initialAri = new AriVector(
+            scoreToAri(request.rhythmChoice()),
+            scoreToAri(request.autonomyChoice()),
+            scoreToAri(request.connectionChoice())
+        );
+        AriVector goalAri = new AriVector(0.8, 0.8, 0.4);
+        goal.updateAri(
+            BigDecimal.valueOf(initialAri.rhythm()),
+            BigDecimal.valueOf(initialAri.autonomy()),
+            BigDecimal.valueOf(initialAri.connection())
+        );
+
+        return SignupResponse.from(
+            user,
+            onboardingResponse,
+            goal,
+            initialAri,
+            goalAri,
+            "Start with rhythm, then open autonomy and connection steps."
+        );
     }
 
     @Transactional(readOnly = true)
@@ -78,6 +99,13 @@ public class AuthService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "email or nickname is invalid."));
 
         return LoginResponse.from(user);
+    }
+
+    private double scoreToAri(Integer score) {
+        if (score == null) {
+            return 0.2;
+        }
+        return Math.max(0.1, Math.min(score, 5) / 5.0);
     }
 
     private void validateSignupRequest(SignupRequest request) {

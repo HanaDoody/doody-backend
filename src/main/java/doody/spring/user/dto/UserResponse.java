@@ -12,17 +12,19 @@ public record UserResponse(
     String email,
     String nickname,
     Boolean isMydataLinked,
+    Integer hanaMoney,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     Onboarding onboarding
 ) {
 
-    public static UserResponse from(User user, OnboardingResponse onboardingResponse) {
+    public static UserResponse from(User user, OnboardingResponse onboardingResponse, Integer hanaMoney) {
         return new UserResponse(
             user.getId(),
             user.getEmail(),
             user.getNickname(),
             user.getMydataLinked(),
+            hanaMoney == null ? 0 : hanaMoney,
             user.getCreatedAt(),
             user.getUpdatedAt(),
             Onboarding.from(onboardingResponse)

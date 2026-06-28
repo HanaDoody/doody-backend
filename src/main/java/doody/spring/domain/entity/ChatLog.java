@@ -48,6 +48,24 @@ public class ChatLog {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    public static ChatLog create(
+        User user,
+        String message,
+        String reply,
+        String currentMissionId,
+        String signals,
+        String suggestedAction
+    ) {
+        ChatLog chatLog = new ChatLog();
+        chatLog.user = user;
+        chatLog.message = message;
+        chatLog.reply = reply;
+        chatLog.currentMissionId = currentMissionId;
+        chatLog.signals = signals;
+        chatLog.suggestedAction = suggestedAction;
+        return chatLog;
+    }
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();
