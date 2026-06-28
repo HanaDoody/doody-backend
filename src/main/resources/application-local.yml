@@ -19,3 +19,6 @@ hana:
   finance:
     autonomy-url: ${HANA_AUTONOMY_URL:https://www.hanafn.com}
     connection-url: ${HANA_CONNECTION_URL:https://www.hanafn.com}
+ai:
+  engine:
+    base-url: ${AI_ENGINE_BASE_URL:}

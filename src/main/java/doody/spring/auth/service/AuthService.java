@@ -1,5 +1,7 @@
 package doody.spring.auth.service;
 
+import doody.spring.auth.client.AiOnboardingClient;
+import doody.spring.auth.client.AiOnboardingClient.AiOnboardingResult;
 import doody.spring.auth.dto.LoginRequest;
 import doody.spring.auth.dto.LoginResponse;
 import doody.spring.auth.dto.SignupRequest;
@@ -23,15 +25,18 @@ public class AuthService {
     private final UserRepository userRepository;
     private final OnboardingResponseRepository onboardingResponseRepository;
     private final GoalRepository goalRepository;
+    private final AiOnboardingClient aiOnboardingClient;
 
     public AuthService(
         UserRepository userRepository,
         OnboardingResponseRepository onboardingResponseRepository,
-        GoalRepository goalRepository
+        GoalRepository goalRepository,
+        AiOnboardingClient aiOnboardingClient
     ) {
         this.userRepository = userRepository;
         this.onboardingResponseRepository = onboardingResponseRepository;
         this.goalRepository = goalRepository;
+        this.aiOnboardingClient = aiOnboardingClient;
     }
 
     @Transactional
@@ -48,12 +53,14 @@ public class AuthService {
             request.isMydataLinked()
         ));
 
+        AiOnboardingResult aiResult = aiOnboardingClient.onboard(user.getId(), request);
+
         OnboardingResponse onboardingResponse = onboardingResponseRepository.save(
             OnboardingResponse.create(
                 user,
                 request.gapAxis(),
                 request.goalChoice(),
-                request.recommendedPeriod(),
+                aiResult.period(),
                 request.rhythmChoice(),
                 request.autonomyChoice(),
                 request.connectionChoice()
@@ -65,16 +72,12 @@ public class AuthService {
             request.gapAxis().getValue(),
             request.autonomyGoal(),
             request.connectionGoal(),
-            request.recommendedPeriod(),
+            aiResult.period(),
             request.firstStepMission()
         ));
 
-        AriVector initialAri = new AriVector(
-            scoreToAri(request.rhythmChoice()),
-            scoreToAri(request.autonomyChoice()),
-            scoreToAri(request.connectionChoice())
-        );
-        AriVector goalAri = new AriVector(0.8, 0.8, 0.4);
+        AriVector initialAri = aiResult.initialAri();
+        AriVector goalAri = aiResult.goal();
         goal.updateAri(
             BigDecimal.valueOf(initialAri.rhythm()),
             BigDecimal.valueOf(initialAri.autonomy()),
@@ -85,9 +88,16 @@ public class AuthService {
             user,
             onboardingResponse,
             goal,
+            aiResult.directionPromise(),
+            aiResult.introMessage(),
+            aiResult.recommendedPeriodOptions(),
+            aiResult.recommendedPeriodMessage(),
             initialAri,
             goalAri,
-            "Start with rhythm, then open autonomy and connection steps."
+            aiResult.startAxis(),
+            aiResult.planSummary(),
+            aiResult.diagnostics(),
+            aiResult.source()
         );
     }
 
@@ -99,13 +109,6 @@ public class AuthService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "email or nickname is invalid."));
 
         return LoginResponse.from(user);
-    }
-
-    private double scoreToAri(Integer score) {
-        if (score == null) {
-            return 0.2;
-        }
-        return Math.max(0.1, Math.min(score, 5) / 5.0);
     }
 
     private void validateSignupRequest(SignupRequest request) {
@@ -120,9 +123,6 @@ public class AuthService {
         }
         if (request.goalChoice() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "goalChoice is required.");
-        }
-        if (request.recommendedPeriod() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "recommendedPeriod is required.");
         }
         if (request.autonomyGoal() == null || request.autonomyGoal().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "autonomyGoal is required.");
