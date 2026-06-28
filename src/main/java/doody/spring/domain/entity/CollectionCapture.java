@@ -50,6 +50,24 @@ public class CollectionCapture {
     @Column(name = "captured_at", nullable = false)
     private LocalDateTime capturedAt;
 
+    public static CollectionCapture create(
+        User user,
+        String pinId,
+        BigDecimal lat,
+        BigDecimal lng,
+        DoodyTemplate doodyTemplate,
+        Integer reward
+    ) {
+        CollectionCapture capture = new CollectionCapture();
+        capture.user = user;
+        capture.pinId = pinId;
+        capture.lat = lat;
+        capture.lng = lng;
+        capture.doodyTemplate = doodyTemplate;
+        capture.reward = reward == null ? 0 : reward;
+        return capture;
+    }
+
     @PrePersist
     void prePersist() {
         if (this.reward == null) {

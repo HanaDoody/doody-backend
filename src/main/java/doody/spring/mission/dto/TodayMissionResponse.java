@@ -7,6 +7,8 @@ public record TodayMissionResponse(
     Mission mission,
     Mission fallback,
     String missionState,
+    String recommendedAxis,
+    String nextPath,
     String restMessage,
     List<Contact> unlockedContacts,
     Double vRhythm,
