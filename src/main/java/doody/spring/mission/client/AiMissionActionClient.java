@@ -13,7 +13,7 @@ public class AiMissionActionClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiMissionActionClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiMissionActionClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }
@@ -59,13 +59,13 @@ public class AiMissionActionClient {
             Math.min((request.currentAri() == null ? 0.2 : request.currentAri().autonomy()) + 0.03, 1.0),
             request.currentAri() == null ? 0.1 : request.currentAri().connection()
         );
-        return new MissionCompleteResult(updated, delta, 1.0, true, false, false, false, List.of(), List.of(), "?먮┰ 誘몄뀡???꾨즺?덉뼱??");
+        return new MissionCompleteResult(updated, delta, 1.0, true, false, false, false, List.of(), List.of(), "Mission completed.");
     }
 
     private MissionRejectResult fallbackReject(MissionRejectAiRequest request) {
         return new MissionRejectResult(
             "downshift",
-            "愿쒖갖?꾩슂. 吏湲?媛?ν븳 留뚰겮留??대룄 異⑸텇?댁슂.",
+            "It is okay to make this easier today.",
             true,
             List.of(),
             new RejectDiagnostics(request.missionId())

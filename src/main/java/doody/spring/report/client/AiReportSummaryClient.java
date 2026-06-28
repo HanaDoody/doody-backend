@@ -14,7 +14,7 @@ public class AiReportSummaryClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiReportSummaryClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiReportSummaryClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }
@@ -47,12 +47,12 @@ public class AiReportSummaryClient {
     }
 
     private ActivitySummary fallback(ReportSummaryStats stats) {
-        String summary = "This period has " + stats.totalRecords() + " records across "
-            + stats.activeDays() + " active days. "
-            + "Rhythm " + stats.axisCounts().getOrDefault("rhythm", 0)
-            + ", autonomy " + stats.axisCounts().getOrDefault("autonomy", 0)
-            + ", and connection " + stats.axisCounts().getOrDefault("connection", 0)
-            + " records were collected.";
+        String summary = "\uC774\uBC88 \uAE30\uAC04\uC5D0\uB294 \uCD1D " + stats.totalRecords() + "\uAC1C\uC758 \uAE30\uB85D\uC744 \uB0A8\uACBC\uACE0, "
+            + stats.activeDays() + "\uC77C \uB3D9\uC548 \uD65C\uB3D9\uD588\uC5B4\uC694. "
+            + "\uB9AC\uB4EC " + stats.axisCounts().getOrDefault("rhythm", 0)
+            + "\uAC1C, \uC790\uB9BD " + stats.axisCounts().getOrDefault("autonomy", 0)
+            + "\uAC1C, \uC5F0\uACB0 " + stats.axisCounts().getOrDefault("connection", 0)
+            + "\uAC1C\uC758 \uAE30\uB85D\uC774 \uBAA8\uC600\uC5B4\uC694.";
 
         return new ActivitySummary(
             summary,

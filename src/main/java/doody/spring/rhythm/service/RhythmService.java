@@ -113,7 +113,7 @@ public class RhythmService {
 
         User user = getUser(request.userId());
         LocalDateTime timestamp = request.timestamp() == null ? LocalDateTime.now() : request.timestamp();
-        AiEveningResult aiResult = aiEveningRhythmClient.leaveNote(user.getId(), request.text());
+        AiEveningResult aiResult = aiEveningRhythmClient.leaveNote(user.getId(), timestamp, request.text());
 
         RhythmLog rhythmLog = rhythmLogRepository.save(RhythmLog.createEvening(
             user,

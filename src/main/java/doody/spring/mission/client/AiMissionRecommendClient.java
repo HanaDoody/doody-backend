@@ -18,7 +18,7 @@ public class AiMissionRecommendClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiMissionRecommendClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiMissionRecommendClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }

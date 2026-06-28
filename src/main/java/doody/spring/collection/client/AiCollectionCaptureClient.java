@@ -18,7 +18,7 @@ public class AiCollectionCaptureClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiCollectionCaptureClient(@Value("${ai.engine.base-url:}") String baseUrl) {
+    public AiCollectionCaptureClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
         this.restClient = RestClient.builder().build();
     }
