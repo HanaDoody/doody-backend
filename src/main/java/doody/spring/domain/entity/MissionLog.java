@@ -49,6 +49,38 @@ public class MissionLog {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    public static MissionLog start(User user, MissionTemplate missionTemplate) {
+        MissionLog log = new MissionLog();
+        log.user = user;
+        log.missionTemplate = missionTemplate;
+        log.actionType = "START";
+        log.startedAt = LocalDateTime.now();
+        return log;
+    }
+
+    public static MissionLog reject(User user, MissionTemplate missionTemplate) {
+        MissionLog log = new MissionLog();
+        log.user = user;
+        log.missionTemplate = missionTemplate;
+        log.actionType = "REJECT";
+        log.skippedAt = LocalDateTime.now();
+        return log;
+    }
+
+    public static MissionLog complete(User user, MissionTemplate missionTemplate) {
+        MissionLog log = new MissionLog();
+        log.user = user;
+        log.missionTemplate = missionTemplate;
+        log.actionType = "COMPLETE";
+        log.completedAt = LocalDateTime.now();
+        return log;
+    }
+
+    public void complete() {
+        this.actionType = "COMPLETE";
+        this.completedAt = LocalDateTime.now();
+    }
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();

@@ -36,6 +36,36 @@ public class MissionTemplate {
     @Column(nullable = false)
     private Integer reward = 0;
 
+    @Column(name = "mission_type", nullable = false, length = 30)
+    private String missionType = "CHECK";
+
+    @Column(nullable = false)
+    private Integer difficulty = 1;
+
+    @Column
+    private Integer stage;
+
+    @Column(columnDefinition = "TEXT")
+    private String reason;
+
+    @Column(name = "how_to", columnDefinition = "TEXT")
+    private String howTo;
+
+    @Column(name = "required_evidence_count", nullable = false)
+    private Integer requiredEvidenceCount = 0;
+
+    @Column(name = "fallback_mission_id", length = 100)
+    private String fallbackMissionId;
+
+    @Column(name = "goal_tags", columnDefinition = "TEXT")
+    private String goalTags;
+
+    @Column(name = "is_signature", nullable = false)
+    private Boolean signature = false;
+
+    @Column(name = "is_fallback", nullable = false)
+    private Boolean fallback = false;
+
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;
 }

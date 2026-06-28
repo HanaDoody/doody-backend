@@ -22,6 +22,7 @@ import doody.spring.mission.dto.TodayMissionResponse.AriVector;
 import doody.spring.mission.dto.TodayMissionResponse.Mission;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -59,9 +60,7 @@ public class MissionService {
 
     @Transactional(readOnly = true)
     public TodayMissionResponse getTodayMission(String userId) {
-        if (userId == null || userId.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "userId is required.");
-        }
+        validateUserId(userId);
         if (!userRepository.existsById(userId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found.");
         }
@@ -83,6 +82,12 @@ public class MissionService {
 
         Mission fallbackMission = fallbackMission();
         return aiMissionRecommendClient.recommend(request, fallbackMission);
+    }
+
+    private void validateUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "userId is required.");
+        }
     }
 
     private AriVector currentAri(Goal goal, String userId) {
@@ -144,31 +149,60 @@ public class MissionService {
     }
 
     private Mission fallbackMission() {
-        return missionTemplateRepository.findTopByActiveTrueOrderByIdAsc()
+        return missionTemplateRepository.findByActiveTrueOrderByIdAsc().stream()
+            .filter(template -> isTargetAxis(template.getAxis()))
+            .findFirst()
             .map(this::toMission)
             .orElse(null);
+    }
+
+    private boolean isTargetAxis(String axis) {
+        String normalized = normalize(axis);
+        return "AUTONOMY".equals(normalized) || "CONNECTION".equals(normalized);
     }
 
     private Mission toMission(MissionTemplate template) {
         return new Mission(
             template.getId(),
             template.getId(),
-            template.getAxis(),
-            null,
+            normalize(template.getAxis()),
+            template.getStage(),
             template.getWaypoint(),
-            1,
-            new AriVector(0.0, 0.01, 0.0),
+            template.getDifficulty(),
+            defaultDelta(template.getAxis()),
             template.getTitle(),
             template.getDescription(),
-            "CHECK",
-            1,
-            false,
-            false,
-            null,
-            List.of(template.getAxis()),
-            List.of(),
-            "Today mission is ready."
+            template.getMissionType(),
+            template.getRequiredEvidenceCount(),
+            template.getSignature(),
+            template.getFallback(),
+            template.getFallbackMissionId(),
+            split(template.getGoalTags()),
+            split(template.getHowTo()),
+            template.getReason() == null ? "Today mission is ready." : template.getReason()
         );
+    }
+
+    private AriVector defaultDelta(String axis) {
+        String normalized = normalize(axis);
+        if ("CONNECTION".equals(normalized)) {
+            return new AriVector(0.0, 0.0, 0.01);
+        }
+        return new AriVector(0.0, 0.01, 0.0);
+    }
+
+    private List<String> split(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(value.split("\\r?\\n|,"))
+            .map(String::strip)
+            .filter(item -> !item.isBlank())
+            .toList();
+    }
+
+    private String normalize(String value) {
+        return value == null ? null : value.strip().toUpperCase();
     }
 
     private Double decimalOrDefault(BigDecimal value, Double defaultValue) {

@@ -39,10 +39,14 @@ public class AiMissionRecommendClient {
                 return fallback(fallbackMission);
             }
 
+            Mission mission = toMission(response.mission());
+            Mission fallback = toMission(response.fallback());
             return new TodayMissionResponse(
-                toMission(response.mission()),
-                toMission(response.fallback()),
+                mission,
+                fallback,
                 response.missionState(),
+                recommendedAxis(mission),
+                nextPath(mission),
                 response.restMessage(),
                 response.unlockedContacts() == null ? List.of() : response.unlockedContacts(),
                 response.vRhythm(),
@@ -60,6 +64,8 @@ public class AiMissionRecommendClient {
                 null,
                 null,
                 "gated",
+                null,
+                null,
                 "Today, rhythm alone is enough.",
                 List.of(),
                 0.0,
@@ -72,12 +78,36 @@ public class AiMissionRecommendClient {
             fallbackMission,
             null,
             "active",
+            recommendedAxis(fallbackMission),
+            nextPath(fallbackMission),
             null,
             List.of(),
             0.8,
             Map.of("source", "fallback_template"),
             "FALLBACK"
         );
+    }
+
+    private String recommendedAxis(Mission mission) {
+        return mission == null ? null : normalizeAxis(mission.axis());
+    }
+
+    private String nextPath(Mission mission) {
+        String axis = recommendedAxis(mission);
+        if ("AUTONOMY".equals(axis)) {
+            return "/autonomy";
+        }
+        if ("CONNECTION".equals(axis)) {
+            return "/connection";
+        }
+        if ("RHYTHM".equals(axis)) {
+            return "/rhythm";
+        }
+        return null;
+    }
+
+    private String normalizeAxis(String axis) {
+        return axis == null ? null : axis.strip().toUpperCase();
     }
 
     private Mission toMission(AiMission mission) {

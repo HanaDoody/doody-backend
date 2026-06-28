@@ -85,6 +85,12 @@ public class Goal {
         return goal;
     }
 
+    public void updateAri(BigDecimal rhythm, BigDecimal autonomy, BigDecimal connection) {
+        this.rhythm = rhythm;
+        this.autonomy = autonomy;
+        this.connection = connection;
+    }
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();

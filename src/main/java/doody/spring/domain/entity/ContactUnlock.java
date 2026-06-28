@@ -49,6 +49,16 @@ public class ContactUnlock {
     @Column(name = "unlocked_at", nullable = false)
     private LocalDateTime unlockedAt;
 
+    public static ContactUnlock create(User user, String contactId, String axis, String source, Long sourceId) {
+        ContactUnlock contactUnlock = new ContactUnlock();
+        contactUnlock.user = user;
+        contactUnlock.contactId = contactId;
+        contactUnlock.axis = axis;
+        contactUnlock.source = source;
+        contactUnlock.sourceId = sourceId;
+        return contactUnlock;
+    }
+
     @PrePersist
     void prePersist() {
         if (this.unlockedAt == null) {
