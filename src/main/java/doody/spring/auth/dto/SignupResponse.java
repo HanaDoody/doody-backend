@@ -5,6 +5,7 @@ import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.OnboardingResponse;
 import doody.spring.domain.entity.User;
 import doody.spring.mission.dto.TodayMissionResponse.AriVector;
+import java.util.List;
 import java.util.Map;
 
 public record SignupResponse(
@@ -15,6 +16,14 @@ public record SignupResponse(
     Long onboardingResponseId,
     Long goalId,
     String firstStepMission,
+    @JsonProperty("direction_promise")
+    String directionPromise,
+    @JsonProperty("intro_message")
+    String introMessage,
+    @JsonProperty("recommended_period_options")
+    List<String> recommendedPeriodOptions,
+    @JsonProperty("recommended_period_message")
+    String recommendedPeriodMessage,
     @JsonProperty("initial_ari")
     AriVector initialAri,
     AriVector goal,
@@ -23,16 +32,24 @@ public record SignupResponse(
     String startAxis,
     @JsonProperty("plan_summary")
     String planSummary,
-    Map<String, Object> diagnostics
+    Map<String, Object> diagnostics,
+    String source
 ) {
 
     public static SignupResponse from(
         User user,
         OnboardingResponse onboardingResponse,
         Goal goal,
+        String directionPromise,
+        String introMessage,
+        List<String> recommendedPeriodOptions,
+        String recommendedPeriodMessage,
         AriVector initialAri,
         AriVector goalAri,
-        String planSummary
+        String startAxis,
+        String planSummary,
+        Map<String, Object> diagnostics,
+        String source
     ) {
         return new SignupResponse(
             user.getId(),
@@ -42,12 +59,17 @@ public record SignupResponse(
             onboardingResponse.getId(),
             goal.getId(),
             goal.getFirstStepMission(),
+            directionPromise,
+            introMessage,
+            recommendedPeriodOptions,
+            recommendedPeriodMessage,
             initialAri,
             goalAri,
             goal.getPeriod() == null ? null : goal.getPeriod().getValue(),
-            goal.getTitle(),
+            startAxis,
             planSummary,
-            null
+            diagnostics,
+            source
         );
     }
 }
