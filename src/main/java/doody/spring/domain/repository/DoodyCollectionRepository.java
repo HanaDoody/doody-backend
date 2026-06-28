@@ -13,4 +13,6 @@ public interface DoodyCollectionRepository extends JpaRepository<DoodyCollection
 
     @EntityGraph(attributePaths = "doodyTemplate")
     Optional<DoodyCollection> findByIdAndUser_Id(Long id, String userId);
+
+    boolean existsByUser_IdAndDoodyTemplate_Id(String userId, String doodyTemplateId);
 }

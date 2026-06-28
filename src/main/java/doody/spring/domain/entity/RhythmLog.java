@@ -52,11 +52,38 @@ public class RhythmLog {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    public static RhythmLog createMorning(User user, LocalDateTime timestamp, String greeting, Integer reward) {
+        RhythmLog rhythmLog = new RhythmLog();
+        rhythmLog.user = user;
+        rhythmLog.rhythmType = "MORNING";
+        rhythmLog.anchorDate = timestamp.toLocalDate();
+        rhythmLog.timestamp = timestamp;
+        rhythmLog.text = greeting;
+        rhythmLog.signals = null;
+        rhythmLog.reward = reward == null ? 0 : reward;
+        return rhythmLog;
+    }
+
+    public static RhythmLog createEvening(User user, LocalDateTime timestamp, String text, String signals, Integer reward) {
+        RhythmLog rhythmLog = new RhythmLog();
+        rhythmLog.user = user;
+        rhythmLog.rhythmType = "EVENING";
+        rhythmLog.anchorDate = timestamp.toLocalDate();
+        rhythmLog.timestamp = timestamp;
+        rhythmLog.text = text;
+        rhythmLog.signals = signals;
+        rhythmLog.reward = reward == null ? 0 : reward;
+        return rhythmLog;
+    }
+
     @PrePersist
     void prePersist() {
         LocalDateTime now = LocalDateTime.now();
         if (this.timestamp == null) {
             this.timestamp = now;
+        }
+        if (this.anchorDate == null) {
+            this.anchorDate = this.timestamp.toLocalDate();
         }
         if (this.reward == null) {
             this.reward = 0;

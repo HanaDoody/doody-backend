@@ -48,6 +48,17 @@ public class PointTransaction {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    public static PointTransaction earn(User user, Integer amount, String reason, String sourceType, Long sourceId) {
+        PointTransaction transaction = new PointTransaction();
+        transaction.user = user;
+        transaction.amount = amount == null ? 0 : amount;
+        transaction.transactionType = "EARN";
+        transaction.reason = reason;
+        transaction.sourceType = sourceType;
+        transaction.sourceId = sourceId;
+        return transaction;
+    }
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();
