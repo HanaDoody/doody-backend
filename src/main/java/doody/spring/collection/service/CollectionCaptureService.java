@@ -13,25 +13,19 @@ import doody.spring.collection.dto.CollectionCaptureResponse.Reward;
 import doody.spring.collection.dto.CollectionPinResponse;
 import doody.spring.domain.entity.CollectionCapture;
 import doody.spring.domain.entity.CollectionPin;
-import doody.spring.domain.entity.ContactUnlock;
-import doody.spring.domain.entity.DoodyCollection;
 import doody.spring.domain.entity.DoodyTemplate;
 import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.Goal;
-import doody.spring.domain.entity.PointTransaction;
 import doody.spring.domain.entity.User;
 import doody.spring.domain.repository.CollectionCaptureRepository;
 import doody.spring.domain.repository.CollectionPinRepository;
-import doody.spring.domain.repository.ContactUnlockRepository;
-import doody.spring.domain.repository.DoodyCollectionRepository;
 import doody.spring.domain.repository.DoodyTemplateRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
-import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.UserRepository;
+import doody.spring.common.service.RewardPersistenceService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -49,9 +43,7 @@ public class CollectionCaptureService {
     private final CollectionPinRepository collectionPinRepository;
     private final CollectionCaptureRepository collectionCaptureRepository;
     private final DoodyTemplateRepository doodyTemplateRepository;
-    private final DoodyCollectionRepository doodyCollectionRepository;
-    private final ContactUnlockRepository contactUnlockRepository;
-    private final PointTransactionRepository pointTransactionRepository;
+    private final RewardPersistenceService rewardPersistenceService;
     private final GoalRepository goalRepository;
     private final EnergyLogRepository energyLogRepository;
     private final AiCollectionCaptureClient aiCollectionCaptureClient;
@@ -61,9 +53,7 @@ public class CollectionCaptureService {
         CollectionPinRepository collectionPinRepository,
         CollectionCaptureRepository collectionCaptureRepository,
         DoodyTemplateRepository doodyTemplateRepository,
-        DoodyCollectionRepository doodyCollectionRepository,
-        ContactUnlockRepository contactUnlockRepository,
-        PointTransactionRepository pointTransactionRepository,
+        RewardPersistenceService rewardPersistenceService,
         GoalRepository goalRepository,
         EnergyLogRepository energyLogRepository,
         AiCollectionCaptureClient aiCollectionCaptureClient
@@ -72,9 +62,7 @@ public class CollectionCaptureService {
         this.collectionPinRepository = collectionPinRepository;
         this.collectionCaptureRepository = collectionCaptureRepository;
         this.doodyTemplateRepository = doodyTemplateRepository;
-        this.doodyCollectionRepository = doodyCollectionRepository;
-        this.contactUnlockRepository = contactUnlockRepository;
-        this.pointTransactionRepository = pointTransactionRepository;
+        this.rewardPersistenceService = rewardPersistenceService;
         this.goalRepository = goalRepository;
         this.energyLogRepository = energyLogRepository;
         this.aiCollectionCaptureClient = aiCollectionCaptureClient;
@@ -137,15 +125,7 @@ public class CollectionCaptureService {
             rewardAmount
         ));
 
-        if (rewardAmount != null && rewardAmount > 0) {
-            pointTransactionRepository.save(PointTransaction.earn(
-                user,
-                rewardAmount,
-                "collection capture",
-                "COLLECTION_CAPTURE",
-                capture.getId()
-            ));
-        }
+        rewardPersistenceService.earnPoint(user, rewardAmount, "collection capture", "COLLECTION_CAPTURE", capture.getId());
 
         saveCollectedDudy(user, capture.getId(), aiResult.collectedDudy(), aiResult.dudy(), capturedTemplate);
         saveUnlockedContacts(user, capture.getId(), aiResult.unlockedContacts());
@@ -178,28 +158,30 @@ public class CollectionCaptureService {
     }
 
     private void saveCollectedDudy(User user, Long captureId, List<Dudy> collectedDudy, Dudy primaryDudy, DoodyTemplate primaryTemplate) {
-        List<Dudy> targets = new ArrayList<>();
+        boolean savedAny = false;
         if (collectedDudy != null) {
-            targets.addAll(collectedDudy);
-        }
-        if (targets.isEmpty() && primaryDudy != null) {
-            targets.add(primaryDudy);
-        }
-
-        for (Dudy dudy : targets) {
-            DoodyTemplate template = resolveTemplate(dudy, primaryTemplate);
-            if (doodyCollectionRepository.existsByUser_IdAndDoodyTemplate_Id(user.getId(), template.getId())) {
-                continue;
+            for (Dudy dudy : collectedDudy) {
+                savedAny = rewardPersistenceService.collectDoody(
+                    user,
+                    dudy.id(),
+                    dudy.tier(),
+                    dudy.axis(),
+                    dudy.earnedReason() == null ? "collection capture" : dudy.earnedReason(),
+                    "COLLECTION_CAPTURE",
+                    captureId
+                ).isPresent() || savedAny;
             }
-            doodyCollectionRepository.save(DoodyCollection.create(
+        }
+        if (!savedAny && primaryDudy != null) {
+            rewardPersistenceService.collectDoody(
                 user,
-                template,
-                dudy.tier() == null ? template.getTier() : dudy.tier(),
-                dudy.axis() == null ? template.getAxis() : dudy.axis(),
-                dudy.earnedReason() == null ? "collection capture" : dudy.earnedReason(),
+                primaryTemplate,
+                primaryDudy.tier(),
+                primaryDudy.axis(),
+                primaryDudy.earnedReason() == null ? "collection capture" : primaryDudy.earnedReason(),
                 "COLLECTION_CAPTURE",
                 captureId
-            ));
+            );
         }
     }
 
@@ -208,22 +190,15 @@ public class CollectionCaptureService {
             return;
         }
         for (Contact contact : contacts) {
-            if (contact.id() == null || contact.id().isBlank()) {
-                continue;
-            }
-            if (contactUnlockRepository.existsByUser_IdAndContactId(user.getId(), contact.id())) {
-                continue;
-            }
-            contactUnlockRepository.save(ContactUnlock.create(
+            rewardPersistenceService.unlockContact(
                 user,
                 contact.id(),
                 contact.axis() == null ? "connection" : contact.axis(),
                 "COLLECTION_CAPTURE",
                 captureId
-            ));
+            );
         }
     }
-
     private void updateGoalAri(String userId, AriVector updatedAri) {
         if (updatedAri == null) {
             return;

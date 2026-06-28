@@ -6,7 +6,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
 
 cloud:
@@ -15,3 +15,7 @@ cloud:
       static: ${AWS_REGION}
     s3:
       bucket: ${S3_BUCKET}
+hana:
+  finance:
+    autonomy-url: ${HANA_AUTONOMY_URL:https://www.hanafn.com}
+    connection-url: ${HANA_CONNECTION_URL:https://www.hanafn.com}

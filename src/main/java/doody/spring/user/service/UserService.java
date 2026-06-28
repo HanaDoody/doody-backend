@@ -3,6 +3,7 @@ package doody.spring.user.service;
 import doody.spring.domain.entity.OnboardingResponse;
 import doody.spring.domain.entity.User;
 import doody.spring.domain.repository.OnboardingResponseRepository;
+import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.UserRepository;
 import doody.spring.user.dto.UserResponse;
 import org.springframework.http.HttpStatus;
@@ -15,13 +16,16 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final OnboardingResponseRepository onboardingResponseRepository;
+    private final PointTransactionRepository pointTransactionRepository;
 
     public UserService(
         UserRepository userRepository,
-        OnboardingResponseRepository onboardingResponseRepository
+        OnboardingResponseRepository onboardingResponseRepository,
+        PointTransactionRepository pointTransactionRepository
     ) {
         this.userRepository = userRepository;
         this.onboardingResponseRepository = onboardingResponseRepository;
+        this.pointTransactionRepository = pointTransactionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -36,7 +40,8 @@ public class UserService {
         OnboardingResponse onboardingResponse = onboardingResponseRepository
             .findTopByUser_IdOrderByCreatedAtDesc(userId)
             .orElse(null);
+        Integer hanaMoney = pointTransactionRepository.sumAmountByUserId(userId);
 
-        return UserResponse.from(user, onboardingResponse);
+        return UserResponse.from(user, onboardingResponse, hanaMoney);
     }
 }

@@ -1,5 +1,6 @@
 package doody.spring.hana.service;
 
+import doody.spring.common.service.RewardPersistenceService;
 import doody.spring.domain.entity.ContactUnlock;
 import doody.spring.domain.entity.DoodyCollection;
 import doody.spring.domain.entity.DoodyTemplate;
@@ -12,9 +13,9 @@ import doody.spring.domain.repository.MissionLogRepository;
 import doody.spring.domain.repository.UserRepository;
 import doody.spring.hana.dto.HanaFinanceUnlockResponse;
 import doody.spring.hana.dto.HanaFinanceUnlockStatusResponse;
-import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,19 +32,28 @@ public class HanaFinanceUnlockService {
     private final ContactUnlockRepository contactUnlockRepository;
     private final DoodyTemplateRepository doodyTemplateRepository;
     private final DoodyCollectionRepository doodyCollectionRepository;
+    private final RewardPersistenceService rewardPersistenceService;
+    private final String autonomyUrl;
+    private final String connectionUrl;
 
     public HanaFinanceUnlockService(
         UserRepository userRepository,
         MissionLogRepository missionLogRepository,
         ContactUnlockRepository contactUnlockRepository,
         DoodyTemplateRepository doodyTemplateRepository,
-        DoodyCollectionRepository doodyCollectionRepository
+        DoodyCollectionRepository doodyCollectionRepository,
+        RewardPersistenceService rewardPersistenceService,
+        @Value("${hana.finance.autonomy-url:https://www.hanafn.com}") String autonomyUrl,
+        @Value("${hana.finance.connection-url:https://www.hanafn.com}") String connectionUrl
     ) {
         this.userRepository = userRepository;
         this.missionLogRepository = missionLogRepository;
         this.contactUnlockRepository = contactUnlockRepository;
         this.doodyTemplateRepository = doodyTemplateRepository;
         this.doodyCollectionRepository = doodyCollectionRepository;
+        this.rewardPersistenceService = rewardPersistenceService;
+        this.autonomyUrl = autonomyUrl;
+        this.connectionUrl = connectionUrl;
     }
 
     @Transactional(readOnly = true)
@@ -79,24 +89,20 @@ public class HanaFinanceUnlockService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "hana finance unlock stage is not reached.");
         }
 
-        boolean newlyUnlocked = false;
-        ContactUnlock contactUnlock = contactUnlockRepository.findByUser_IdAndContactId(userId, meta.contactId())
-            .orElse(null);
-        if (contactUnlock == null) {
-            contactUnlock = contactUnlockRepository.save(ContactUnlock.create(
-                user,
-                meta.contactId(),
-                meta.axis().toLowerCase(Locale.ROOT),
-                SOURCE,
-                null
-            ));
-            newlyUnlocked = true;
-        }
+        boolean contactAlreadyUnlocked = contactUnlockRepository.existsByUser_IdAndContactId(userId, meta.contactId());
+        ContactUnlock contactUnlock = rewardPersistenceService.unlockContact(
+            user,
+            meta.contactId(),
+            meta.axis().toLowerCase(Locale.ROOT),
+            SOURCE,
+            null
+        ).orElseThrow();
 
         DoodyCollection rareDoody = findCollectedRareDoody(userId, meta);
+        boolean newlyUnlocked = !contactAlreadyUnlocked || rareDoody == null;
         if (rareDoody == null) {
             DoodyTemplate template = resolveRareDoodyTemplate(meta);
-            rareDoody = doodyCollectionRepository.save(DoodyCollection.create(
+            rareDoody = rewardPersistenceService.collectDoody(
                 user,
                 template,
                 "rare",
@@ -104,7 +110,7 @@ public class HanaFinanceUnlockService {
                 meta.earnedReason(),
                 SOURCE,
                 contactUnlock.getId()
-            ));
+            ).orElseGet(() -> findCollectedRareDoody(userId, meta));
             newlyUnlocked = true;
         }
 
@@ -121,7 +127,7 @@ public class HanaFinanceUnlockService {
                 contactUnlock.getUnlockedAt()
             ),
             toUnlockRareDoody(rareDoody, meta),
-            newlyUnlocked ? meta.unlockMessage() : "?대? ?닿툑???섎굹 湲덉쑖 ?쒗깮?댁뿉??"
+            newlyUnlocked ? meta.unlockMessage() : "Hana finance benefit is already unlocked."
         );
     }
 
@@ -151,15 +157,7 @@ public class HanaFinanceUnlockService {
 
     private HanaFinanceUnlockStatusResponse.RareDoody toStatusRareDoody(DoodyCollection collection, AxisMeta meta) {
         if (collection == null) {
-            return new HanaFinanceUnlockStatusResponse.RareDoody(
-                null,
-                meta.rareDoodyId(),
-                null,
-                "rare",
-                meta.axis(),
-                null,
-                null
-            );
+            return new HanaFinanceUnlockStatusResponse.RareDoody(null, meta.rareDoodyId(), null, "rare", meta.axis(), null, null);
         }
         return new HanaFinanceUnlockStatusResponse.RareDoody(
             collection.getId(),
@@ -200,7 +198,7 @@ public class HanaFinanceUnlockService {
                 "AUTONOMY",
                 "hana_autonomy_benefit",
                 "Autonomy benefit",
-                "https://www.hanafn.com",
+                autonomyUrl,
                 "d_autonomy_rare_hana",
                 "Rare dudy earned by autonomy stage unlock.",
                 "Autonomy stage unlocked."
@@ -211,7 +209,7 @@ public class HanaFinanceUnlockService {
                 "CONNECTION",
                 "hana_connection_benefit",
                 "Connection benefit",
-                "https://www.hanafn.com",
+                connectionUrl,
                 "d_connection_rare_hana",
                 "Rare dudy earned by connection stage unlock.",
                 "Connection stage unlocked."
@@ -219,6 +217,7 @@ public class HanaFinanceUnlockService {
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "axis must be AUTONOMY or CONNECTION.");
     }
+
     private record AxisMeta(
         String axis,
         String contactId,

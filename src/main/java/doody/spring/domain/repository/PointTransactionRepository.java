@@ -19,4 +19,11 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
         @Param("startAt") LocalDateTime startAt,
         @Param("endAt") LocalDateTime endAt
     );
+
+    @Query("""
+        select coalesce(sum(point.amount), 0)
+        from PointTransaction point
+        where point.user.id = :userId
+        """)
+    Integer sumAmountByUserId(@Param("userId") String userId);
 }

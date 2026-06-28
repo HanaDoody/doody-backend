@@ -8,26 +8,19 @@ import doody.spring.autonomy.dto.AutonomyMissionRejectResponse;
 import doody.spring.autonomy.dto.AutonomyMissionStartResponse;
 import doody.spring.autonomy.dto.AutonomyPathResponse;
 import doody.spring.autonomy.dto.AutonomyPathResponse.Node;
-import doody.spring.domain.entity.ContactUnlock;
-import doody.spring.domain.entity.DoodyCollection;
-import doody.spring.domain.entity.DoodyTemplate;
 import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.MissionEvidence;
 import doody.spring.domain.entity.MissionLog;
 import doody.spring.domain.entity.MissionTemplate;
-import doody.spring.domain.entity.PointTransaction;
 import doody.spring.domain.entity.User;
-import doody.spring.domain.repository.ContactUnlockRepository;
-import doody.spring.domain.repository.DoodyCollectionRepository;
-import doody.spring.domain.repository.DoodyTemplateRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.MissionEvidenceRepository;
 import doody.spring.domain.repository.MissionLogRepository;
 import doody.spring.domain.repository.MissionTemplateRepository;
-import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.UserRepository;
+import doody.spring.common.service.RewardPersistenceService;
 import doody.spring.mission.client.AiMissionActionClient;
 import doody.spring.mission.client.AiMissionActionClient.Contact;
 import doody.spring.mission.client.AiMissionActionClient.Dudy;
@@ -54,10 +47,7 @@ public class AutonomyMissionService {
     private final MissionEvidenceRepository missionEvidenceRepository;
     private final GoalRepository goalRepository;
     private final EnergyLogRepository energyLogRepository;
-    private final PointTransactionRepository pointTransactionRepository;
-    private final DoodyTemplateRepository doodyTemplateRepository;
-    private final DoodyCollectionRepository doodyCollectionRepository;
-    private final ContactUnlockRepository contactUnlockRepository;
+    private final RewardPersistenceService rewardPersistenceService;
     private final AiMissionActionClient aiMissionActionClient;
 
     public AutonomyMissionService(
@@ -67,10 +57,7 @@ public class AutonomyMissionService {
         MissionEvidenceRepository missionEvidenceRepository,
         GoalRepository goalRepository,
         EnergyLogRepository energyLogRepository,
-        PointTransactionRepository pointTransactionRepository,
-        DoodyTemplateRepository doodyTemplateRepository,
-        DoodyCollectionRepository doodyCollectionRepository,
-        ContactUnlockRepository contactUnlockRepository,
+        RewardPersistenceService rewardPersistenceService,
         AiMissionActionClient aiMissionActionClient
     ) {
         this.userRepository = userRepository;
@@ -79,10 +66,7 @@ public class AutonomyMissionService {
         this.missionEvidenceRepository = missionEvidenceRepository;
         this.goalRepository = goalRepository;
         this.energyLogRepository = energyLogRepository;
-        this.pointTransactionRepository = pointTransactionRepository;
-        this.doodyTemplateRepository = doodyTemplateRepository;
-        this.doodyCollectionRepository = doodyCollectionRepository;
-        this.contactUnlockRepository = contactUnlockRepository;
+        this.rewardPersistenceService = rewardPersistenceService;
         this.aiMissionActionClient = aiMissionActionClient;
     }
 
@@ -285,13 +269,7 @@ public class AutonomyMissionService {
         if (reward == null || reward <= 0) {
             return;
         }
-        pointTransactionRepository.save(PointTransaction.earn(
-            user,
-            reward,
-            mission.getTitle(),
-            "MISSION",
-            log.getId()
-        ));
+        rewardPersistenceService.earnPoint(user, reward, mission.getTitle(), "MISSION", log.getId());
     }
 
     private void updateGoalAri(String userId, AriVector updatedAri) {
@@ -326,22 +304,15 @@ public class AutonomyMissionService {
             return;
         }
         for (Dudy dudy : collectedDudy) {
-            if (dudy.id() == null || dudy.id().isBlank()) {
-                continue;
-            }
-            DoodyTemplate template = doodyTemplateRepository.findById(dudy.id()).orElse(null);
-            if (template == null || doodyCollectionRepository.existsByUser_IdAndDoodyTemplate_Id(user.getId(), template.getId())) {
-                continue;
-            }
-            doodyCollectionRepository.save(DoodyCollection.create(
+            rewardPersistenceService.collectDoody(
                 user,
-                template,
-                dudy.tier() == null ? template.getTier() : dudy.tier(),
-                dudy.axis() == null ? template.getAxis() : dudy.axis(),
+                dudy.id(),
+                dudy.tier(),
+                dudy.axis(),
                 dudy.earnedReason() == null ? "mission complete" : dudy.earnedReason(),
                 "MISSION",
                 missionLogId
-            ));
+            );
         }
     }
 
@@ -350,22 +321,15 @@ public class AutonomyMissionService {
             return;
         }
         for (Contact contact : contacts) {
-            if (contact.id() == null || contact.id().isBlank()) {
-                continue;
-            }
-            if (contactUnlockRepository.existsByUser_IdAndContactId(user.getId(), contact.id())) {
-                continue;
-            }
-            contactUnlockRepository.save(ContactUnlock.create(
+            rewardPersistenceService.unlockContact(
                 user,
                 contact.id(),
                 contact.axis() == null ? "autonomy" : contact.axis(),
                 "MISSION",
                 missionLogId
-            ));
+            );
         }
     }
-
     private List<String> split(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
