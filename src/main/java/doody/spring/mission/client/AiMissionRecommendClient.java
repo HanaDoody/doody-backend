@@ -8,12 +8,16 @@ import doody.spring.mission.dto.TodayMissionResponse.Mission;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
 public class AiMissionRecommendClient {
+
+    private static final Logger log = LoggerFactory.getLogger(AiMissionRecommendClient.class);
 
     private final String baseUrl;
     private final RestClient restClient;
@@ -25,10 +29,19 @@ public class AiMissionRecommendClient {
 
     public TodayMissionResponse recommend(AiMissionRecommendRequest request, Mission fallbackMission) {
         if (baseUrl.isBlank()) {
+            log.warn("AI mission recommend fallback: AI_ENGINE_BASE_URL is blank. userId={}, hasFallbackMission={}",
+                request == null ? null : request.userId(),
+                fallbackMission != null);
             return fallback(fallbackMission);
         }
 
         try {
+            log.info("AI mission recommend request: url={}, userId={}, energy={}, historyCount={}",
+                baseUrl + "/mission/recommend",
+                request == null ? null : request.userId(),
+                request == null ? null : request.energy(),
+                request == null || request.history() == null ? 0 : request.history().size());
+
             AiMissionRecommendResponse response = restClient.post()
                 .uri(baseUrl + "/mission/recommend")
                 .body(request)
@@ -36,11 +49,20 @@ public class AiMissionRecommendClient {
                 .body(AiMissionRecommendResponse.class);
 
             if (response == null) {
+                log.warn("AI mission recommend fallback: response body is null. userId={}, hasFallbackMission={}",
+                    request == null ? null : request.userId(),
+                    fallbackMission != null);
                 return fallback(fallbackMission);
             }
 
             Mission mission = toMission(response.mission());
             Mission fallback = toMission(response.fallback());
+            log.info("AI mission recommend response: userId={}, missionState={}, missionId={}, restMessagePresent={}, fallbackMissionId={}",
+                request == null ? null : request.userId(),
+                response.missionState(),
+                mission == null ? null : mission.missionId(),
+                response.restMessage() != null && !response.restMessage().isBlank(),
+                fallback == null ? null : fallback.missionId());
             return new TodayMissionResponse(
                 mission,
                 fallback,
@@ -54,6 +76,11 @@ public class AiMissionRecommendClient {
                 "AI"
             );
         } catch (Exception exception) {
+            log.warn("AI mission recommend fallback: request failed. userId={}, url={}, hasFallbackMission={}",
+                request == null ? null : request.userId(),
+                baseUrl + "/mission/recommend",
+                fallbackMission != null,
+                exception);
             return fallback(fallbackMission);
         }
     }
