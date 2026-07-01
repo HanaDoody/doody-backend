@@ -72,6 +72,7 @@ public class RhythmService {
 
         User user = getUser(request.userId());
         LocalDateTime timestamp = request.timestamp() == null ? LocalDateTime.now() : request.timestamp();
+        validateNotDuplicateRhythm(user.getId(), "MORNING", timestamp);
 
         AiMorningResult aiResult = aiMorningRhythmClient.checkIn(user.getId(), timestamp, request.energy());
 
@@ -113,6 +114,8 @@ public class RhythmService {
 
         User user = getUser(request.userId());
         LocalDateTime timestamp = request.timestamp() == null ? LocalDateTime.now() : request.timestamp();
+        validateMorningChecked(user.getId(), timestamp);
+        validateNotDuplicateRhythm(user.getId(), "EVENING", timestamp);
         AiEveningResult aiResult = aiEveningRhythmClient.leaveNote(user.getId(), timestamp, request.text());
 
         RhythmLog rhythmLog = rhythmLogRepository.save(RhythmLog.createEvening(
@@ -234,6 +237,18 @@ public class RhythmService {
     private User getUser(String userId) {
         return userRepository.findById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found."));
+    }
+
+    private void validateNotDuplicateRhythm(String userId, String rhythmType, LocalDateTime timestamp) {
+        if (rhythmLogRepository.existsByUser_IdAndRhythmTypeAndAnchorDate(userId, rhythmType, timestamp.toLocalDate())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, rhythmType.toLowerCase() + " rhythm already checked today.");
+        }
+    }
+
+    private void validateMorningChecked(String userId, LocalDateTime timestamp) {
+        if (!rhythmLogRepository.existsByUser_IdAndRhythmTypeAndAnchorDate(userId, "MORNING", timestamp.toLocalDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "morning rhythm must be checked before evening rhythm.");
+        }
     }
 
     private void validateMorning(MorningRhythmRequest request) {
