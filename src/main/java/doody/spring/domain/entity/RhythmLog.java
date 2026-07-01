@@ -15,8 +15,6 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
@@ -45,8 +43,7 @@ public class RhythmLog {
     @Column(columnDefinition = "TEXT")
     private String text;
 
-    @Column(columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "TEXT")
     private String signals;
 
     @Column(nullable = false)
