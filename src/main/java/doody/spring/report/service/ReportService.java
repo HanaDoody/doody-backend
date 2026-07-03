@@ -141,7 +141,7 @@ public class ReportService {
             .toList();
 
         ActivitySummary activitySummary = "month".equals(reportPeriod.value())
-            ? getOrCreateMonthlyActivitySummary(user, reportPeriod, buildStats(summary, axisSummaries, missionLogs))
+            ? generateMonthlyActivitySummary(user, reportPeriod, buildStats(summary, axisSummaries, missionLogs))
             : null;
 
         return new RecoveryReportResponse(
@@ -155,50 +155,54 @@ public class ReportService {
         );
     }
 
-    private ActivitySummary getOrCreateMonthlyActivitySummary(
-        User user,
-        ReportPeriod reportPeriod,
-        ReportSummaryStats stats
-    ) {
-        return reportSummaryRepository
-            .findTopByUser_IdAndPeriodAndPeriodStartAndPeriodEndOrderByGeneratedAtDesc(
-                user.getId(),
-                "1m",
-                reportPeriod.startDate(),
-                reportPeriod.endDate()
-            )
-            .map(this::toActivitySummary)
-            .orElseGet(() -> createAndSaveMonthlyActivitySummary(user, reportPeriod, stats));
-    }
-
-    private ActivitySummary createAndSaveMonthlyActivitySummary(
+    private ActivitySummary generateMonthlyActivitySummary(
         User user,
         ReportPeriod reportPeriod,
         ReportSummaryStats stats
     ) {
         ActivitySummary activitySummary = aiReportSummaryClient.summarize(user.getId(), "1m", stats);
 
-        reportSummaryRepository.save(ReportSummary.create(
-            user,
-            "1m",
-            reportPeriod.startDate(),
-            reportPeriod.endDate(),
-            toStatsJson(stats),
-            activitySummary.summary(),
-            toJsonArray(activitySummary.highlights()),
-            activitySummary.generatedAt()
-        ));
+        if ("AI".equals(activitySummary.source())) {
+            saveOrUpdateMonthlyActivitySummary(user, reportPeriod, stats, activitySummary);
+        }
 
         return activitySummary;
     }
 
-    private ActivitySummary toActivitySummary(ReportSummary reportSummary) {
-        return new ActivitySummary(
-            reportSummary.getSummary(),
-            readJsonArray(reportSummary.getHighlights()),
-            reportSummary.getGeneratedAt(),
-            "DB"
-        );
+    private void saveOrUpdateMonthlyActivitySummary(
+        User user,
+        ReportPeriod reportPeriod,
+        ReportSummaryStats stats,
+        ActivitySummary activitySummary
+    ) {
+        String statsJson = toStatsJson(stats);
+        String highlightsJson = toJsonArray(activitySummary.highlights());
+
+        reportSummaryRepository
+            .findTopByUser_IdAndPeriodAndPeriodStartAndPeriodEndOrderByGeneratedAtDesc(
+                user.getId(),
+                "1m",
+                reportPeriod.startDate(),
+                reportPeriod.endDate()
+            )
+            .ifPresentOrElse(
+                reportSummary -> reportSummary.update(
+                    statsJson,
+                    activitySummary.summary(),
+                    highlightsJson,
+                    activitySummary.generatedAt()
+                ),
+                () -> reportSummaryRepository.save(ReportSummary.create(
+                    user,
+                    "1m",
+                    reportPeriod.startDate(),
+                    reportPeriod.endDate(),
+                    statsJson,
+                    activitySummary.summary(),
+                    highlightsJson,
+                    activitySummary.generatedAt()
+                ))
+            );
     }
 
     private String toStatsJson(ReportSummaryStats stats) {
@@ -236,52 +240,6 @@ public class ReportService {
             .map(value -> "\"" + escapeJson(value) + "\"")
             .reduce("[", (acc, item) -> "[".equals(acc) ? acc + item : acc + "," + item)
             + "]";
-    }
-
-    private List<String> readJsonArray(String jsonArray) {
-        if (jsonArray == null || jsonArray.length() < 2) {
-            return List.of();
-        }
-
-        String trimmed = jsonArray.trim();
-        if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
-            return List.of();
-        }
-
-        String body = trimmed.substring(1, trimmed.length() - 1).trim();
-        if (body.isEmpty()) {
-            return List.of();
-        }
-
-        List<String> values = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean inString = false;
-        boolean escaped = false;
-
-        for (int i = 0; i < body.length(); i++) {
-            char ch = body.charAt(i);
-            if (escaped) {
-                current.append(ch);
-                escaped = false;
-                continue;
-            }
-            if (ch == '\\') {
-                escaped = true;
-                continue;
-            }
-            if (ch == '"') {
-                inString = !inString;
-                continue;
-            }
-            if (ch == ',' && !inString) {
-                values.add(current.toString());
-                current.setLength(0);
-                continue;
-            }
-            current.append(ch);
-        }
-        values.add(current.toString());
-        return values;
     }
 
     private String escapeJson(String value) {

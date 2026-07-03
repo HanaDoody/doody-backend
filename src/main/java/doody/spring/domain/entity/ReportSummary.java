@@ -74,6 +74,13 @@ public class ReportSummary {
         return reportSummary;
     }
 
+    public void update(String stats, String summary, String highlights, LocalDateTime generatedAt) {
+        this.stats = stats;
+        this.summary = summary;
+        this.highlights = highlights;
+        this.generatedAt = generatedAt == null ? LocalDateTime.now() : generatedAt;
+    }
+
     @PrePersist
     void prePersist() {
         if (this.generatedAt == null) {

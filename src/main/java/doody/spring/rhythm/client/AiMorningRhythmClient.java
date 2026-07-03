@@ -38,7 +38,7 @@ public class AiMorningRhythmClient {
 
             Integer hanaMoney = response.reward() == null ? 0 : response.reward().hanaMoney();
             String greeting = response.greeting() == null || response.greeting().isBlank()
-                ? "Today is checked in."
+                ? "오늘의 아침 리듬이 기록됐어요."
                 : response.greeting();
             List<CollectedDudy> collectedDudy = response.collectedDudy() == null
                 ? List.of()
@@ -53,7 +53,7 @@ public class AiMorningRhythmClient {
     private AiMorningResult fallback() {
         return new AiMorningResult(
             20,
-            "Today is checked in.",
+            "오늘의 아침 리듬이 기록됐어요.",
             List.of()
         );
     }
