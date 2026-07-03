@@ -205,7 +205,7 @@ public class CollectionCaptureService {
         }
         goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId)
             .ifPresent(goal -> goal.updateAri(
-                toBigDecimal(updatedAri.rhythm()),
+                goal.getRhythm(),
                 toBigDecimal(updatedAri.autonomy()),
                 toBigDecimal(updatedAri.connection())
             ));
@@ -214,7 +214,7 @@ public class CollectionCaptureService {
     private AriVector currentAri(String userId) {
         Goal goal = goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId).orElse(null);
         return new AriVector(
-            goal == null || goal.getRhythm() == null ? 0.8 : goal.getRhythm().doubleValue(),
+            goal == null || goal.getRhythm() == null ? 0.2 : goal.getRhythm().doubleValue(),
             goal == null || goal.getAutonomy() == null ? 0.3 : goal.getAutonomy().doubleValue(),
             goal == null || goal.getConnection() == null ? 0.35 : goal.getConnection().doubleValue()
         );

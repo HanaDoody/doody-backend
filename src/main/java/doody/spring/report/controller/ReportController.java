@@ -22,11 +22,6 @@ public class ReportController {
         this.reportService = reportService;
     }
 
-    @GetMapping
-    public ApiResponse<List<ReportSummaryResponse>> getReports(@PathVariable String userId) {
-        return ApiResponse.success(HttpStatus.OK, "report lookup success.", reportService.getReports(userId));
-    }
-
     @GetMapping("/recovery")
     public ApiResponse<RecoveryReportResponse> getRecoveryReport(
         @PathVariable String userId,

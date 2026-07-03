@@ -129,7 +129,7 @@ public class MissionService {
 
     private AriVector currentAri(Goal goal, String userId) {
         return new AriVector(
-            rhythmReadiness(userId),
+            decimalOrDefault(goal == null ? null : goal.getRhythm(), 0.2),
             decimalOrDefault(goal == null ? null : goal.getAutonomy(), 0.2),
             decimalOrDefault(goal == null ? null : goal.getConnection(), 0.1)
         );
@@ -141,17 +141,6 @@ public class MissionService {
             decimalOrDefault(goal == null ? null : goal.getAutonomy(), 0.8),
             decimalOrDefault(goal == null ? null : goal.getConnection(), 0.4)
         );
-    }
-
-    private Double rhythmReadiness(String userId) {
-        LocalDate today = LocalDate.now();
-        boolean hasMorning = rhythmLogRepository.findByUser_IdAndTimestampBetweenOrderByTimestampDesc(
-                userId,
-                today.atStartOfDay(),
-                today.plusDays(1).atStartOfDay().minusNanos(1)
-            ).stream()
-            .anyMatch(log -> "MORNING".equals(log.getRhythmType()));
-        return hasMorning ? 0.8 : 0.2;
     }
 
     private RhythmHistory rhythmHistory(String userId) {
