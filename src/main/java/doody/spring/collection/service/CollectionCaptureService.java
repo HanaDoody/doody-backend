@@ -25,9 +25,11 @@ import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.UserRepository;
 import doody.spring.common.service.RewardPersistenceService;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,8 @@ public class CollectionCaptureService {
 
     private static final double DEFAULT_RADIUS_METER = 500.0;
     private static final double CAPTURE_DISTANCE_METER = 100.0;
+    private static final double RANDOM_PIN_RADIUS_METER = 90.0;
+    private static final int DEFAULT_PIN_COUNT = 5;
 
     private final UserRepository userRepository;
     private final CollectionPinRepository collectionPinRepository;
@@ -68,16 +72,58 @@ public class CollectionCaptureService {
         this.aiCollectionCaptureClient = aiCollectionCaptureClient;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<CollectionPinResponse> getNearbyPins(BigDecimal lat, BigDecimal lng, Double radiusMeter) {
         validateLocation(lat, lng);
         double radius = radiusMeter == null ? DEFAULT_RADIUS_METER : radiusMeter;
 
+        List<CollectionPinResponse> nearbyPins = nearbyPinResponses(lat, lng, radius);
+        if (nearbyPins.size() < DEFAULT_PIN_COUNT) {
+            generateRandomPins(lat, lng, DEFAULT_PIN_COUNT - nearbyPins.size());
+            nearbyPins = nearbyPinResponses(lat, lng, radius);
+        }
+
+        return nearbyPins.stream()
+            .limit(DEFAULT_PIN_COUNT)
+            .toList();
+    }
+
+    private List<CollectionPinResponse> nearbyPinResponses(BigDecimal lat, BigDecimal lng, double radius) {
         return collectionPinRepository.findByActiveTrue().stream()
             .map(pin -> toPinResponse(pin, lat, lng))
             .filter(pin -> pin.distanceMeter() <= radius)
             .sorted(Comparator.comparing(CollectionPinResponse::distanceMeter))
             .toList();
+    }
+
+    private void generateRandomPins(BigDecimal lat, BigDecimal lng, int count) {
+        List<DoodyTemplate> templates = doodyTemplateRepository.findByActiveTrue();
+        if (templates.isEmpty() || count <= 0) {
+            return;
+        }
+
+        for (int i = 0; i < count; i++) {
+            DoodyTemplate template = templates.get(ThreadLocalRandom.current().nextInt(templates.size()));
+            RandomPoint point = randomPointNear(lat.doubleValue(), lng.doubleValue());
+            collectionPinRepository.save(CollectionPin.createRandom(
+                template.getName() + " 발견 지점",
+                toCoordinate(point.lat()),
+                toCoordinate(point.lng()),
+                template
+            ));
+        }
+    }
+
+    private RandomPoint randomPointNear(double lat, double lng) {
+        double distance = RANDOM_PIN_RADIUS_METER * Math.sqrt(ThreadLocalRandom.current().nextDouble());
+        double bearing = ThreadLocalRandom.current().nextDouble(0, Math.PI * 2);
+        double latOffset = (distance * Math.cos(bearing)) / 111_320.0;
+        double lngOffset = (distance * Math.sin(bearing)) / (111_320.0 * Math.cos(Math.toRadians(lat)));
+        return new RandomPoint(lat + latOffset, lng + lngOffset);
+    }
+
+    private BigDecimal toCoordinate(double value) {
+        return BigDecimal.valueOf(value).setScale(6, RoundingMode.HALF_UP);
     }
 
     @Transactional
@@ -271,5 +317,11 @@ public class CollectionCaptureService {
             * Math.sin(lngDistance / 2) * Math.sin(lngDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return earthRadius * c;
+    }
+
+    private record RandomPoint(
+        double lat,
+        double lng
+    ) {
     }
 }

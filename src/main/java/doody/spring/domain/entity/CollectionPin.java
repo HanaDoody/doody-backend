@@ -10,6 +10,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -42,6 +43,17 @@ public class CollectionPin {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    public static CollectionPin createRandom(String title, BigDecimal lat, BigDecimal lng, DoodyTemplate doodyTemplate) {
+        CollectionPin pin = new CollectionPin();
+        pin.id = "pin_" + UUID.randomUUID();
+        pin.title = title;
+        pin.lat = lat;
+        pin.lng = lng;
+        pin.doodyTemplate = doodyTemplate;
+        pin.active = true;
+        return pin;
+    }
 
     @PrePersist
     void prePersist() {
