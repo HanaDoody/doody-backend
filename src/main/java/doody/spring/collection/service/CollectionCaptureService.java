@@ -11,23 +11,27 @@ import doody.spring.collection.dto.CollectionCaptureResponse.Contact;
 import doody.spring.collection.dto.CollectionCaptureResponse.Dudy;
 import doody.spring.collection.dto.CollectionCaptureResponse.Reward;
 import doody.spring.collection.dto.CollectionPinResponse;
+import doody.spring.domain.entity.AriSnapshot;
 import doody.spring.domain.entity.CollectionCapture;
 import doody.spring.domain.entity.CollectionPin;
 import doody.spring.domain.entity.DoodyTemplate;
 import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.AriSnapshotRepository;
 import doody.spring.domain.repository.CollectionCaptureRepository;
 import doody.spring.domain.repository.CollectionPinRepository;
+import doody.spring.domain.repository.DoodyCollectionRepository;
 import doody.spring.domain.repository.DoodyTemplateRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.UserRepository;
 import doody.spring.common.service.RewardPersistenceService;
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,46 +42,96 @@ public class CollectionCaptureService {
 
     private static final double DEFAULT_RADIUS_METER = 500.0;
     private static final double CAPTURE_DISTANCE_METER = 100.0;
+    private static final double RANDOM_PIN_RADIUS_METER = 90.0;
+    private static final int DEFAULT_PIN_COUNT = 5;
 
     private final UserRepository userRepository;
     private final CollectionPinRepository collectionPinRepository;
     private final CollectionCaptureRepository collectionCaptureRepository;
+    private final DoodyCollectionRepository doodyCollectionRepository;
     private final DoodyTemplateRepository doodyTemplateRepository;
     private final RewardPersistenceService rewardPersistenceService;
     private final GoalRepository goalRepository;
     private final EnergyLogRepository energyLogRepository;
     private final AiCollectionCaptureClient aiCollectionCaptureClient;
+    private final AriSnapshotRepository ariSnapshotRepository;
 
     public CollectionCaptureService(
         UserRepository userRepository,
         CollectionPinRepository collectionPinRepository,
         CollectionCaptureRepository collectionCaptureRepository,
+        DoodyCollectionRepository doodyCollectionRepository,
         DoodyTemplateRepository doodyTemplateRepository,
         RewardPersistenceService rewardPersistenceService,
         GoalRepository goalRepository,
         EnergyLogRepository energyLogRepository,
-        AiCollectionCaptureClient aiCollectionCaptureClient
+        AiCollectionCaptureClient aiCollectionCaptureClient,
+        AriSnapshotRepository ariSnapshotRepository
     ) {
         this.userRepository = userRepository;
         this.collectionPinRepository = collectionPinRepository;
         this.collectionCaptureRepository = collectionCaptureRepository;
+        this.doodyCollectionRepository = doodyCollectionRepository;
         this.doodyTemplateRepository = doodyTemplateRepository;
         this.rewardPersistenceService = rewardPersistenceService;
         this.goalRepository = goalRepository;
         this.energyLogRepository = energyLogRepository;
         this.aiCollectionCaptureClient = aiCollectionCaptureClient;
+        this.ariSnapshotRepository = ariSnapshotRepository;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<CollectionPinResponse> getNearbyPins(BigDecimal lat, BigDecimal lng, Double radiusMeter) {
         validateLocation(lat, lng);
         double radius = radiusMeter == null ? DEFAULT_RADIUS_METER : radiusMeter;
 
+        List<CollectionPinResponse> nearbyPins = nearbyPinResponses(lat, lng, radius);
+        if (nearbyPins.size() < DEFAULT_PIN_COUNT) {
+            generateRandomPins(lat, lng, DEFAULT_PIN_COUNT - nearbyPins.size());
+            nearbyPins = nearbyPinResponses(lat, lng, radius);
+        }
+
+        return nearbyPins.stream()
+            .limit(DEFAULT_PIN_COUNT)
+            .toList();
+    }
+
+    private List<CollectionPinResponse> nearbyPinResponses(BigDecimal lat, BigDecimal lng, double radius) {
         return collectionPinRepository.findByActiveTrue().stream()
             .map(pin -> toPinResponse(pin, lat, lng))
             .filter(pin -> pin.distanceMeter() <= radius)
             .sorted(Comparator.comparing(CollectionPinResponse::distanceMeter))
             .toList();
+    }
+
+    private void generateRandomPins(BigDecimal lat, BigDecimal lng, int count) {
+        List<DoodyTemplate> templates = doodyTemplateRepository.findByActiveTrue();
+        if (templates.isEmpty() || count <= 0) {
+            return;
+        }
+
+        for (int i = 0; i < count; i++) {
+            DoodyTemplate template = templates.get(ThreadLocalRandom.current().nextInt(templates.size()));
+            RandomPoint point = randomPointNear(lat.doubleValue(), lng.doubleValue());
+            collectionPinRepository.save(CollectionPin.createRandom(
+                template.getName() + " 발견 지점",
+                toCoordinate(point.lat()),
+                toCoordinate(point.lng()),
+                template
+            ));
+        }
+    }
+
+    private RandomPoint randomPointNear(double lat, double lng) {
+        double distance = RANDOM_PIN_RADIUS_METER * Math.sqrt(ThreadLocalRandom.current().nextDouble());
+        double bearing = ThreadLocalRandom.current().nextDouble(0, Math.PI * 2);
+        double latOffset = (distance * Math.cos(bearing)) / 111_320.0;
+        double lngOffset = (distance * Math.sin(bearing)) / (111_320.0 * Math.cos(Math.toRadians(lat)));
+        return new RandomPoint(lat + latOffset, lng + lngOffset);
+    }
+
+    private BigDecimal toCoordinate(double value) {
+        return BigDecimal.valueOf(value).setScale(6, RoundingMode.HALF_UP);
     }
 
     @Transactional
@@ -98,8 +152,9 @@ public class CollectionCaptureService {
             pin.getDoodyTemplate().getId(),
             pin.getDoodyTemplate().getTier(),
             pin.getDoodyTemplate().getAxis(),
-            "Captured nearby dudy."
+            "근처에서 발견한 두디야."
         );
+        long currentCollectionCount = doodyCollectionRepository.countByUser_Id(user.getId());
 
         AiCaptureResult aiResult = aiCollectionCaptureClient.capture(
             new AiCaptureRequest(
@@ -108,7 +163,8 @@ public class CollectionCaptureService {
                 new Location(request.lat(), request.lng()),
                 currentAri(user.getId()),
                 goalAri(user.getId()),
-                latestEnergy(user.getId())
+                latestEnergy(user.getId()),
+                currentCollectionCount
             ),
             fallbackDudy
         );
@@ -130,6 +186,7 @@ public class CollectionCaptureService {
         saveCollectedDudy(user, capture.getId(), aiResult.collectedDudy(), aiResult.dudy(), capturedTemplate);
         saveUnlockedContacts(user, capture.getId(), aiResult.unlockedContacts());
         updateGoalAri(user.getId(), aiResult.updatedAri());
+        saveAriSnapshot(user, capture.getId(), aiResult.updatedAri());
 
         return new CollectionCaptureResponse(
             capture.getId(),
@@ -205,16 +262,24 @@ public class CollectionCaptureService {
         }
         goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId)
             .ifPresent(goal -> goal.updateAri(
-                toBigDecimal(updatedAri.rhythm()),
+                goal.getRhythm(),
                 toBigDecimal(updatedAri.autonomy()),
                 toBigDecimal(updatedAri.connection())
             ));
     }
 
     private AriVector currentAri(String userId) {
+        AriSnapshot snapshot = ariSnapshotRepository.findTopByUser_IdOrderByTimestampDesc(userId).orElse(null);
+        if (snapshot != null) {
+            return new AriVector(
+                snapshot.getRhythm().doubleValue(),
+                snapshot.getAutonomy().doubleValue(),
+                snapshot.getConnection().doubleValue()
+            );
+        }
         Goal goal = goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId).orElse(null);
         return new AriVector(
-            goal == null || goal.getRhythm() == null ? 0.8 : goal.getRhythm().doubleValue(),
+            goal == null || goal.getRhythm() == null ? 0.2 : goal.getRhythm().doubleValue(),
             goal == null || goal.getAutonomy() == null ? 0.3 : goal.getAutonomy().doubleValue(),
             goal == null || goal.getConnection() == null ? 0.35 : goal.getConnection().doubleValue()
         );
@@ -233,6 +298,29 @@ public class CollectionCaptureService {
         return energyLogRepository.findTopByUser_IdOrderByCreatedAtDesc(userId)
             .map(EnergyLog::getEnergy)
             .orElse((short) 4);
+    }
+
+    private void saveAriSnapshot(User user, Long captureId, AriVector updatedAri) {
+        if (updatedAri == null) {
+            return;
+        }
+        BigDecimal rhythmSeed = ariSnapshotRepository.findTopByUser_IdOrderByTimestampDesc(user.getId())
+            .map(AriSnapshot::getRhythm)
+            .orElseGet(() -> currentRhythmSeed(user.getId()));
+        ariSnapshotRepository.save(AriSnapshot.create(
+            user,
+            rhythmSeed,
+            toBigDecimal(updatedAri.autonomy()),
+            toBigDecimal(updatedAri.connection()),
+            "COLLECTION_CAPTURE",
+            captureId
+        ));
+    }
+
+    private BigDecimal currentRhythmSeed(String userId) {
+        return goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId)
+            .map(Goal::getRhythm)
+            .orElse(BigDecimal.valueOf(0.2));
     }
 
     private DoodyTemplate resolveTemplate(Dudy dudy, DoodyTemplate fallbackTemplate) {
@@ -271,5 +359,11 @@ public class CollectionCaptureService {
             * Math.sin(lngDistance / 2) * Math.sin(lngDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return earthRadius * c;
+    }
+
+    private record RandomPoint(
+        double lat,
+        double lng
+    ) {
     }
 }

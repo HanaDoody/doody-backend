@@ -24,6 +24,15 @@ public interface MissionLogRepository extends JpaRepository<MissionLog, Long> {
         LocalDateTime endAt
     );
 
+    @Query("""
+        select count(distinct ml.missionTemplate.id)
+        from MissionLog ml
+        where ml.user.id = :userId
+          and ml.completedAt is not null
+          and (ml.missionTemplate.fallback is null or ml.missionTemplate.fallback = false)
+        """)
+    long countCompletedRealMissionsByUserId(@Param("userId") String userId);
+
     @EntityGraph(attributePaths = "missionTemplate")
     List<MissionLog> findTop20ByUser_IdOrderByCreatedAtDesc(String userId);
 

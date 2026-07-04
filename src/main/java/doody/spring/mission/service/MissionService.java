@@ -2,10 +2,12 @@ package doody.spring.mission.service;
 
 import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.Goal;
+import doody.spring.domain.entity.AriSnapshot;
 import doody.spring.domain.entity.MissionLog;
 import doody.spring.domain.entity.MissionTemplate;
 import doody.spring.domain.entity.RhythmLog;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.AriSnapshotRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.MissionLogRepository;
@@ -42,6 +44,7 @@ public class MissionService {
     private final MissionLogRepository missionLogRepository;
     private final MissionTemplateRepository missionTemplateRepository;
     private final AiMissionRecommendClient aiMissionRecommendClient;
+    private final AriSnapshotRepository ariSnapshotRepository;
 
     public MissionService(
         UserRepository userRepository,
@@ -50,7 +53,8 @@ public class MissionService {
         RhythmLogRepository rhythmLogRepository,
         MissionLogRepository missionLogRepository,
         MissionTemplateRepository missionTemplateRepository,
-        AiMissionRecommendClient aiMissionRecommendClient
+        AiMissionRecommendClient aiMissionRecommendClient,
+        AriSnapshotRepository ariSnapshotRepository
     ) {
         this.userRepository = userRepository;
         this.goalRepository = goalRepository;
@@ -59,6 +63,7 @@ public class MissionService {
         this.missionLogRepository = missionLogRepository;
         this.missionTemplateRepository = missionTemplateRepository;
         this.aiMissionRecommendClient = aiMissionRecommendClient;
+        this.ariSnapshotRepository = ariSnapshotRepository;
     }
 
     @Transactional
@@ -109,16 +114,37 @@ public class MissionService {
     }
 
     private Optional<MissionTemplate> resolveMissionTemplate(Mission mission) {
-        if (mission.missionId() != null && !mission.missionId().isBlank()) {
-            Optional<MissionTemplate> template = missionTemplateRepository.findById(mission.missionId());
-            if (template.isPresent()) {
-                return template;
-            }
+        String missionId = missionTemplateId(mission);
+        if (missionId == null) {
+            return Optional.empty();
         }
-        if (mission.id() != null && !mission.id().isBlank()) {
-            return missionTemplateRepository.findById(mission.id());
+
+        Optional<MissionTemplate> existing = missionTemplateRepository.findById(missionId);
+        if (existing.isPresent()) {
+            return existing;
         }
-        return Optional.empty();
+
+        if (normalize(mission.axis()) == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(missionTemplateRepository.save(MissionTemplate.createDynamic(
+            missionId,
+            normalize(mission.axis()),
+            mission.stage(),
+            mission.waypoint(),
+            mission.difficulty(),
+            defaultTitle(mission),
+            mission.description(),
+            mission.missionType(),
+            mission.requiredCount(),
+            mission.isSignature(),
+            mission.isFallback(),
+            mission.fallbackMissionId(),
+            join(mission.goalTags()),
+            join(mission.howTo()),
+            mission.reason()
+        )));
     }
 
     private void validateUserId(String userId) {
@@ -128,8 +154,16 @@ public class MissionService {
     }
 
     private AriVector currentAri(Goal goal, String userId) {
+        AriSnapshot snapshot = ariSnapshotRepository.findTopByUser_IdOrderByTimestampDesc(userId).orElse(null);
+        if (snapshot != null) {
+            return new AriVector(
+                decimalOrDefault(snapshot.getRhythm(), 0.2),
+                decimalOrDefault(snapshot.getAutonomy(), 0.2),
+                decimalOrDefault(snapshot.getConnection(), 0.1)
+            );
+        }
         return new AriVector(
-            rhythmReadiness(userId),
+            decimalOrDefault(goal == null ? null : goal.getRhythm(), 0.2),
             decimalOrDefault(goal == null ? null : goal.getAutonomy(), 0.2),
             decimalOrDefault(goal == null ? null : goal.getConnection(), 0.1)
         );
@@ -141,17 +175,6 @@ public class MissionService {
             decimalOrDefault(goal == null ? null : goal.getAutonomy(), 0.8),
             decimalOrDefault(goal == null ? null : goal.getConnection(), 0.4)
         );
-    }
-
-    private Double rhythmReadiness(String userId) {
-        LocalDate today = LocalDate.now();
-        boolean hasMorning = rhythmLogRepository.findByUser_IdAndTimestampBetweenOrderByTimestampDesc(
-                userId,
-                today.atStartOfDay(),
-                today.plusDays(1).atStartOfDay().minusNanos(1)
-            ).stream()
-            .anyMatch(log -> "MORNING".equals(log.getRhythmType()));
-        return hasMorning ? 0.8 : 0.2;
     }
 
     private RhythmHistory rhythmHistory(String userId) {
@@ -216,7 +239,7 @@ public class MissionService {
             template.getFallbackMissionId(),
             split(template.getGoalTags()),
             split(template.getHowTo()),
-            template.getReason() == null ? "Today mission is ready." : template.getReason()
+            template.getReason() == null ? "오늘 할 수 있는 작은 미션이 준비됐어." : template.getReason()
         );
     }
 
@@ -236,6 +259,35 @@ public class MissionService {
             .map(String::strip)
             .filter(item -> !item.isBlank())
             .toList();
+    }
+
+    private String missionTemplateId(Mission mission) {
+        if (mission.missionId() != null && !mission.missionId().isBlank()) {
+            return mission.missionId().strip();
+        }
+        if (mission.id() != null && !mission.id().isBlank()) {
+            return mission.id().strip();
+        }
+        return null;
+    }
+
+    private String defaultTitle(Mission mission) {
+        if (mission.title() != null && !mission.title().isBlank()) {
+            return mission.title();
+        }
+        String missionId = missionTemplateId(mission);
+        return missionId == null ? "AI 미션" : missionId;
+    }
+
+    private String join(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values.stream()
+            .filter(value -> value != null && !value.isBlank())
+            .map(String::strip)
+            .reduce((left, right) -> left + "\n" + right)
+            .orElse(null);
     }
 
     private String normalize(String value) {

@@ -1,0 +1,48 @@
+name: Deploy Spring Backend to EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build jar
+        run: ./gradlew clean bootJar -x test
+
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload jar to EC2
+        run: |
+          scp -i ~/.ssh/ec2_key build/libs/*.jar \
+            "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/tmp/doody-backend.jar"
+
+      - name: Restart app on EC2
+        run: |
+          ssh -i ~/.ssh/ec2_key "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}" << 'EOF'
+            set -e
+            sudo mkdir -p /opt/doody
+            sudo mv /tmp/doody-backend.jar /opt/doody/app.jar
+            sudo chown -R doody:doody /opt/doody || true
+            sudo systemctl daemon-reload
+            sudo systemctl restart doody-backend
+            sudo systemctl status doody-backend --no-pager
+          EOF

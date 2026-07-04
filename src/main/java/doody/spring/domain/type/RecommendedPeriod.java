@@ -21,7 +21,7 @@ public enum RecommendedPeriod {
         return Arrays.stream(values())
             .filter(period -> period.value.equalsIgnoreCase(value))
             .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("吏?먰븯吏 ?딅뒗 recommendedPeriod?낅땲?? " + value));
+            .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 recommendedPeriod야: " + value));
     }
 
     @JsonValue

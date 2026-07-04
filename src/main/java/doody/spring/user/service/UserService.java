@@ -2,6 +2,7 @@ package doody.spring.user.service;
 
 import doody.spring.domain.entity.OnboardingResponse;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.MissionLogRepository;
 import doody.spring.domain.repository.OnboardingResponseRepository;
 import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.UserRepository;
@@ -17,15 +18,18 @@ public class UserService {
     private final UserRepository userRepository;
     private final OnboardingResponseRepository onboardingResponseRepository;
     private final PointTransactionRepository pointTransactionRepository;
+    private final MissionLogRepository missionLogRepository;
 
     public UserService(
         UserRepository userRepository,
         OnboardingResponseRepository onboardingResponseRepository,
-        PointTransactionRepository pointTransactionRepository
+        PointTransactionRepository pointTransactionRepository,
+        MissionLogRepository missionLogRepository
     ) {
         this.userRepository = userRepository;
         this.onboardingResponseRepository = onboardingResponseRepository;
         this.pointTransactionRepository = pointTransactionRepository;
+        this.missionLogRepository = missionLogRepository;
     }
 
     @Transactional(readOnly = true)
@@ -41,7 +45,8 @@ public class UserService {
             .findTopByUser_IdOrderByCreatedAtDesc(userId)
             .orElse(null);
         Integer hanaMoney = pointTransactionRepository.sumAmountByUserId(userId);
+        long completedMissionCount = missionLogRepository.countCompletedRealMissionsByUserId(userId);
 
-        return UserResponse.from(user, onboardingResponse, hanaMoney);
+        return UserResponse.from(user, onboardingResponse, hanaMoney, completedMissionCount);
     }
 }

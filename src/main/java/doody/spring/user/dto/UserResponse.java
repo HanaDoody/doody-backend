@@ -13,18 +13,25 @@ public record UserResponse(
     String nickname,
     Boolean isMydataLinked,
     Integer hanaMoney,
+    Long completedMissionCount,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     Onboarding onboarding
 ) {
 
-    public static UserResponse from(User user, OnboardingResponse onboardingResponse, Integer hanaMoney) {
+    public static UserResponse from(
+        User user,
+        OnboardingResponse onboardingResponse,
+        Integer hanaMoney,
+        long completedMissionCount
+    ) {
         return new UserResponse(
             user.getId(),
             user.getEmail(),
             user.getNickname(),
             user.getMydataLinked(),
             hanaMoney == null ? 0 : hanaMoney,
+            completedMissionCount,
             user.getCreatedAt(),
             user.getUpdatedAt(),
             Onboarding.from(onboardingResponse)

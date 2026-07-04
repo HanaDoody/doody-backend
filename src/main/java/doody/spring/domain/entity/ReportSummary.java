@@ -15,8 +15,6 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
@@ -42,15 +40,13 @@ public class ReportSummary {
     @Column(name = "period_end", nullable = false)
     private LocalDate periodEnd;
 
-    @Column(nullable = false, columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String stats;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String summary;
 
-    @Column(nullable = false, columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String highlights;
 
     @Column(name = "generated_at", nullable = false)
@@ -76,6 +72,13 @@ public class ReportSummary {
         reportSummary.highlights = highlights;
         reportSummary.generatedAt = generatedAt;
         return reportSummary;
+    }
+
+    public void update(String stats, String summary, String highlights, LocalDateTime generatedAt) {
+        this.stats = stats;
+        this.summary = summary;
+        this.highlights = highlights;
+        this.generatedAt = generatedAt == null ? LocalDateTime.now() : generatedAt;
     }
 
     @PrePersist

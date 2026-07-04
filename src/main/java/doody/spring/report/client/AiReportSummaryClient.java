@@ -4,12 +4,16 @@ import doody.spring.report.dto.RecoveryReportResponse.ActivitySummary;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
 public class AiReportSummaryClient {
+
+    private static final Logger log = LoggerFactory.getLogger(AiReportSummaryClient.class);
 
     private final String baseUrl;
     private final RestClient restClient;
@@ -21,6 +25,7 @@ public class AiReportSummaryClient {
 
     public ActivitySummary summarize(String userId, String period, ReportSummaryStats stats) {
         if (baseUrl.isBlank()) {
+            log.warn("AI report summary fallback: ai.engine.base-url is blank. userId={}, period={}", userId, period);
             return fallback(stats);
         }
 
@@ -32,6 +37,11 @@ public class AiReportSummaryClient {
                 .body(AiReportSummaryResponse.class);
 
             if (response == null || response.summary() == null || response.summary().isBlank()) {
+                log.warn("AI report summary fallback: response summary is blank. userId={}, period={}, url={}",
+                    userId,
+                    period,
+                    baseUrl + "/report/summary"
+                );
                 return fallback(stats);
             }
 
@@ -42,24 +52,30 @@ public class AiReportSummaryClient {
                 "AI"
             );
         } catch (Exception exception) {
+            log.warn("AI report summary fallback: request failed. userId={}, period={}, url={}",
+                userId,
+                period,
+                baseUrl + "/report/summary",
+                exception
+            );
             return fallback(stats);
         }
     }
 
     private ActivitySummary fallback(ReportSummaryStats stats) {
-       String summary = "This period has " + stats.totalRecords() + " records across "
-            + stats.activeDays() + " active days. "
-            + "Rhythm " + stats.axisCounts().getOrDefault("rhythm", 0)
-            + ", autonomy " + stats.axisCounts().getOrDefault("autonomy", 0)
-            + ", and connection " + stats.axisCounts().getOrDefault("connection", 0)
-            + " records were collected.";
+        String summary = "이번 기간에는 총 " + stats.totalRecords() + "개의 기록이 "
+            + stats.activeDays() + "일 동안 쌓였어. "
+            + "리듬 " + stats.axisCounts().getOrDefault("rhythm", 0)
+            + "개, 자립 " + stats.axisCounts().getOrDefault("autonomy", 0)
+            + "개, 연결 " + stats.axisCounts().getOrDefault("connection", 0)
+            + "개의 기록이 모였고 작은 회복 흐름을 이어가고 있어.";
 
         return new ActivitySummary(
             summary,
             List.of(
-                "Total records: " + stats.totalRecords(),
-                "Active days: " + stats.activeDays(),
-                "Points: +" + stats.points() + "P"
+                "이번 기간에는 총 " + stats.totalRecords() + "개의 기록을 남겼어.",
+                "기록이 이어진 날은 모두 " + stats.activeDays() + "일이야.",
+                "회복 흐름 속에서 +" + stats.points() + "P를 모았어."
             ),
             LocalDateTime.now(),
             "FALLBACK"

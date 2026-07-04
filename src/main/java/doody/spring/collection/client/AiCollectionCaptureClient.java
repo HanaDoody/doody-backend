@@ -85,7 +85,9 @@ public class AiCollectionCaptureClient {
         @JsonProperty("current_ari")
         AriVector currentAri,
         AriVector goal,
-        Short energy
+        Short energy,
+        @JsonProperty("current_collection_count")
+        Long currentCollectionCount
     ) {
     }
 

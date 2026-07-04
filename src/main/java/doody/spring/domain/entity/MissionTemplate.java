@@ -68,4 +68,77 @@ public class MissionTemplate {
 
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;
+
+    public static MissionTemplate createDynamic(
+        String id,
+        String axis,
+        Integer stage,
+        String waypoint,
+        Integer difficulty,
+        String title,
+        String description,
+        String missionType,
+        Integer requiredEvidenceCount,
+        Boolean signature,
+        Boolean fallback,
+        String fallbackMissionId,
+        String goalTags,
+        String howTo,
+        String reason
+    ) {
+        MissionTemplate template = new MissionTemplate();
+        template.id = id;
+        template.applyDynamic(
+            axis,
+            stage,
+            waypoint,
+            difficulty,
+            title,
+            description,
+            missionType,
+            requiredEvidenceCount,
+            signature,
+            fallback,
+            fallbackMissionId,
+            goalTags,
+            howTo,
+            reason
+        );
+        template.reward = 0;
+        template.active = true;
+        return template;
+    }
+
+    private void applyDynamic(
+        String axis,
+        Integer stage,
+        String waypoint,
+        Integer difficulty,
+        String title,
+        String description,
+        String missionType,
+        Integer requiredEvidenceCount,
+        Boolean signature,
+        Boolean fallback,
+        String fallbackMissionId,
+        String goalTags,
+        String howTo,
+        String reason
+    ) {
+        this.axis = axis;
+        this.stage = stage;
+        this.waypoint = waypoint;
+        this.difficulty = difficulty == null ? 1 : difficulty;
+        this.title = title;
+        this.description = description;
+        this.missionType = missionType == null || missionType.isBlank() ? "CHECK" : missionType;
+        this.requiredEvidenceCount = requiredEvidenceCount == null ? 0 : requiredEvidenceCount;
+        this.signature = signature != null && signature;
+        this.fallback = fallback != null && fallback;
+        this.fallbackMissionId = fallbackMissionId;
+        this.goalTags = goalTags;
+        this.howTo = howTo;
+        this.reason = reason;
+        this.active = true;
+    }
 }

@@ -59,13 +59,13 @@ public class AiMissionActionClient {
             Math.min((request.currentAri() == null ? 0.2 : request.currentAri().autonomy()) + 0.03, 1.0),
             request.currentAri() == null ? 0.1 : request.currentAri().connection()
         );
-        return new MissionCompleteResult(updated, delta, 1.0, true, false, false, false, List.of(), List.of(), "Mission completed.");
+        return new MissionCompleteResult(updated, delta, 1.0, true, false, false, false, List.of(), List.of(), "좋아. 작은 행동 하나가 오늘의 자율감을 조금 열었어.");
     }
 
     private MissionRejectResult fallbackReject(MissionRejectAiRequest request) {
         return new MissionRejectResult(
             "downshift",
-            "It is okay to make this easier today.",
+            "괜찮아. 오늘은 더 쉬운 버전으로 바꿔볼게.",
             true,
             List.of(),
             new RejectDiagnostics(request.missionId())

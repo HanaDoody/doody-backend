@@ -93,7 +93,7 @@ public class AiMissionRecommendClient {
                 "gated",
                 null,
                 null,
-                "Today, rhythm alone is enough.",
+                "오늘은 리듬만 붙잡아도 충분해.",
                 List.of(),
                 0.0,
                 Map.of("source", "fallback_no_template"),
@@ -141,10 +141,13 @@ public class AiMissionRecommendClient {
         if (mission == null) {
             return null;
         }
+        String missionId = mission.missionId() == null || mission.missionId().isBlank()
+            ? mission.id()
+            : mission.missionId();
 
         return new Mission(
             mission.id(),
-            mission.missionId(),
+            missionId,
             mission.axis(),
             mission.stage(),
             mission.waypoint(),
