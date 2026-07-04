@@ -36,7 +36,7 @@ public class AiChatClient {
 
     private AiChatResponse fallback() {
         return new AiChatResponse(
-            "It is okay to make this smaller today. One tiny step still counts.",
+            "오늘은 더 작게 해도 괜찮아. 아주 작은 한 걸음도 충분히 의미 있어.",
             null,
             "offer_downshift",
             "FALLBACK"

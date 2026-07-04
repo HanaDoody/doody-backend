@@ -226,7 +226,7 @@ public class MissionService {
             template.getFallbackMissionId(),
             split(template.getGoalTags()),
             split(template.getHowTo()),
-            template.getReason() == null ? "Today mission is ready." : template.getReason()
+            template.getReason() == null ? "오늘 할 수 있는 작은 미션이 준비됐어." : template.getReason()
         );
     }
 
@@ -263,7 +263,7 @@ public class MissionService {
             return mission.title();
         }
         String missionId = missionTemplateId(mission);
-        return missionId == null ? "AI mission" : missionId;
+        return missionId == null ? "AI 미션" : missionId;
     }
 
     private String join(List<String> values) {

@@ -48,8 +48,8 @@ public class AiOnboardingClient {
 
     private AiIntroResponse intro(String userId, SignupRequest request) {
         AiIntroResponse fallback = new AiIntroResponse(
-            "Start gently from today's condition.",
-            "Doody will help you begin at a comfortable pace."
+            "오늘 상태에 맞춰서 천천히 시작해볼게.",
+            "두디가 부담 없는 속도로 같이 시작해줄게."
         );
         if (baseUrl.isBlank()) {
             return fallback;
@@ -71,7 +71,7 @@ public class AiOnboardingClient {
         AiRecommendPeriodResponse fallback = new AiRecommendPeriodResponse(
             request.recommendedPeriod() == null ? "1w" : request.recommendedPeriod().getValue(),
             PERIOD_OPTIONS,
-            "Start with a small period that is easy to keep."
+            "처음엔 지키기 쉬운 작은 기간부터 시작해보자."
         );
         if (baseUrl.isBlank()) {
             return fallback;
@@ -95,7 +95,7 @@ public class AiOnboardingClient {
             new AriVector(0.8, 0.8, 0.4),
             period.getValue(),
             "rhythm",
-            "Start with rhythm, then open autonomy and connection steps.",
+            "먼저 리듬을 잡고, 자립과 연결로 천천히 이어가자.",
             Map.of("source", "fallback")
         );
         if (baseUrl.isBlank()) {

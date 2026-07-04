@@ -22,7 +22,7 @@ public enum GapAxis {
         return Arrays.stream(values())
             .filter(axis -> axis.value.equalsIgnoreCase(value))
             .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("吏?먰븯吏 ?딅뒗 gapAxis?낅땲?? " + value));
+            .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 gapAxis야: " + value));
     }
 
     @JsonValue

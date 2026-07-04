@@ -87,7 +87,7 @@ public class AutonomyMissionService {
             .map(template -> toNode(template, logs, currentStep))
             .toList();
 
-        return new AutonomyPathResponse("?癒?뵲ON", currentStep, true, nodes);
+        return new AutonomyPathResponse("자립ON", currentStep, true, nodes);
     }
 
     @Transactional(readOnly = true)

@@ -63,19 +63,19 @@ public class AiReportSummaryClient {
     }
 
     private ActivitySummary fallback(ReportSummaryStats stats) {
-       String summary = "이번 기간에는 총 " + stats.totalRecords() + "개의 기록이 "
-            + stats.activeDays() + "일 동안 쌓였어요. "
+        String summary = "이번 기간에는 총 " + stats.totalRecords() + "개의 기록이 "
+            + stats.activeDays() + "일 동안 쌓였어. "
             + "리듬 " + stats.axisCounts().getOrDefault("rhythm", 0)
             + "개, 자립 " + stats.axisCounts().getOrDefault("autonomy", 0)
             + "개, 연결 " + stats.axisCounts().getOrDefault("connection", 0)
-            + "개의 기록이 모였고, 작은 회복 흐름을 이어가고 있어요.";
+            + "개의 기록이 모였고 작은 회복 흐름을 이어가고 있어.";
 
         return new ActivitySummary(
             summary,
             List.of(
-                "이번 기간에는 총 " + stats.totalRecords() + "개의 기록을 남겼어요.",
-                "기록이 이어진 날은 모두 " + stats.activeDays() + "일이에요.",
-                "회복 흐름 속에서 +" + stats.points() + "P를 모았어요."
+                "이번 기간에는 총 " + stats.totalRecords() + "개의 기록을 남겼어.",
+                "기록이 이어진 날은 모두 " + stats.activeDays() + "일이야.",
+                "회복 흐름 속에서 +" + stats.points() + "P를 모았어."
             ),
             LocalDateTime.now(),
             "FALLBACK"

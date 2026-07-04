@@ -93,7 +93,7 @@ public class AiMissionRecommendClient {
                 "gated",
                 null,
                 null,
-                "Today, rhythm alone is enough.",
+                "오늘은 리듬만 붙잡아도 충분해.",
                 List.of(),
                 0.0,
                 Map.of("source", "fallback_no_template"),

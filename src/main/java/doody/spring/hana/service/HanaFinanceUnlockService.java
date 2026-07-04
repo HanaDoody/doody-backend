@@ -127,7 +127,7 @@ public class HanaFinanceUnlockService {
                 contactUnlock.getUnlockedAt()
             ),
             toUnlockRareDoody(rareDoody, meta),
-            newlyUnlocked ? meta.unlockMessage() : "Hana finance benefit is already unlocked."
+            newlyUnlocked ? meta.unlockMessage() : "이미 하나 금융 혜택이 열려 있어."
         );
     }
 
@@ -197,22 +197,22 @@ public class HanaFinanceUnlockService {
             return new AxisMeta(
                 "AUTONOMY",
                 "hana_autonomy_benefit",
-                "Autonomy benefit",
+                "자립 혜택",
                 autonomyUrl,
                 "d_autonomy_rare_hana",
-                "Rare dudy earned by autonomy stage unlock.",
-                "Autonomy stage unlocked."
+                "자립 단계를 열어서 얻은 레어 두디야.",
+                "자립 금융 혜택이 열렸어."
             );
         }
         if ("CONNECTION".equals(normalized)) {
             return new AxisMeta(
                 "CONNECTION",
                 "hana_connection_benefit",
-                "Connection benefit",
+                "연결 혜택",
                 connectionUrl,
                 "d_connection_rare_hana",
-                "Rare dudy earned by connection stage unlock.",
-                "Connection stage unlocked."
+                "연결 단계를 열어서 얻은 레어 두디야.",
+                "연결 금융 혜택이 열렸어."
             );
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "axis must be AUTONOMY or CONNECTION.");

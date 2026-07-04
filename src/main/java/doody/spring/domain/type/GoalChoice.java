@@ -20,7 +20,7 @@ public enum GoalChoice {
         return Arrays.stream(values())
             .filter(choice -> choice.value.equalsIgnoreCase(value))
             .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("吏?먰븯吏 ?딅뒗 goalChoice?낅땲?? " + value));
+            .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 goalChoice야: " + value));
     }
 
     @JsonValue
