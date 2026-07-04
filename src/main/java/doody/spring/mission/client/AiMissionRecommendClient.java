@@ -141,10 +141,13 @@ public class AiMissionRecommendClient {
         if (mission == null) {
             return null;
         }
+        String missionId = mission.missionId() == null || mission.missionId().isBlank()
+            ? mission.id()
+            : mission.missionId();
 
         return new Mission(
             mission.id(),
-            mission.missionId(),
+            missionId,
             mission.axis(),
             mission.stage(),
             mission.waypoint(),

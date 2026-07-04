@@ -109,16 +109,37 @@ public class MissionService {
     }
 
     private Optional<MissionTemplate> resolveMissionTemplate(Mission mission) {
-        if (mission.missionId() != null && !mission.missionId().isBlank()) {
-            Optional<MissionTemplate> template = missionTemplateRepository.findById(mission.missionId());
-            if (template.isPresent()) {
-                return template;
-            }
+        String missionId = missionTemplateId(mission);
+        if (missionId == null) {
+            return Optional.empty();
         }
-        if (mission.id() != null && !mission.id().isBlank()) {
-            return missionTemplateRepository.findById(mission.id());
+
+        Optional<MissionTemplate> existing = missionTemplateRepository.findById(missionId);
+        if (existing.isPresent()) {
+            return existing;
         }
-        return Optional.empty();
+
+        if (normalize(mission.axis()) == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(missionTemplateRepository.save(MissionTemplate.createDynamic(
+            missionId,
+            normalize(mission.axis()),
+            mission.stage(),
+            mission.waypoint(),
+            mission.difficulty(),
+            defaultTitle(mission),
+            mission.description(),
+            mission.missionType(),
+            mission.requiredCount(),
+            mission.isSignature(),
+            mission.isFallback(),
+            mission.fallbackMissionId(),
+            join(mission.goalTags()),
+            join(mission.howTo()),
+            mission.reason()
+        )));
     }
 
     private void validateUserId(String userId) {
@@ -225,6 +246,35 @@ public class MissionService {
             .map(String::strip)
             .filter(item -> !item.isBlank())
             .toList();
+    }
+
+    private String missionTemplateId(Mission mission) {
+        if (mission.missionId() != null && !mission.missionId().isBlank()) {
+            return mission.missionId().strip();
+        }
+        if (mission.id() != null && !mission.id().isBlank()) {
+            return mission.id().strip();
+        }
+        return null;
+    }
+
+    private String defaultTitle(Mission mission) {
+        if (mission.title() != null && !mission.title().isBlank()) {
+            return mission.title();
+        }
+        String missionId = missionTemplateId(mission);
+        return missionId == null ? "AI mission" : missionId;
+    }
+
+    private String join(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values.stream()
+            .filter(value -> value != null && !value.isBlank())
+            .map(String::strip)
+            .reduce((left, right) -> left + "\n" + right)
+            .orElse(null);
     }
 
     private String normalize(String value) {
