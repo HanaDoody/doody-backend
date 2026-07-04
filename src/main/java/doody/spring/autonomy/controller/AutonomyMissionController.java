@@ -9,6 +9,8 @@ import doody.spring.autonomy.dto.AutonomyMissionStartResponse;
 import doody.spring.autonomy.dto.AutonomyPathResponse;
 import doody.spring.autonomy.service.AutonomyMissionService;
 import doody.spring.common.dto.ApiResponse;
+import doody.spring.common.service.S3FileStorageService;
+import doody.spring.common.service.S3FileStorageService.UploadedFile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +27,14 @@ import org.springframework.web.multipart.MultipartFile;
 public class AutonomyMissionController {
 
     private final AutonomyMissionService autonomyMissionService;
+    private final S3FileStorageService s3FileStorageService;
 
-    public AutonomyMissionController(AutonomyMissionService autonomyMissionService) {
+    public AutonomyMissionController(
+        AutonomyMissionService autonomyMissionService,
+        S3FileStorageService s3FileStorageService
+    ) {
         this.autonomyMissionService = autonomyMissionService;
+        this.s3FileStorageService = s3FileStorageService;
     }
 
     @GetMapping("/path")
@@ -71,8 +78,9 @@ public class AutonomyMissionController {
         String resolvedUrl = fileUrl;
         String resolvedContentType = contentType;
         if ((resolvedUrl == null || resolvedUrl.isBlank()) && file != null && !file.isEmpty()) {
-            resolvedUrl = "upload://" + file.getOriginalFilename();
-            resolvedContentType = file.getContentType();
+            UploadedFile uploadedFile = s3FileStorageService.uploadEvidence(userId, missionId, file);
+            resolvedUrl = uploadedFile.url();
+            resolvedContentType = uploadedFile.contentType();
         }
         return ApiResponse.success(
             HttpStatus.OK,

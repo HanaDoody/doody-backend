@@ -18,6 +18,7 @@ cloud:
       static: ${AWS_REGION}
     s3:
       bucket: ${S3_BUCKET}
+      public-base-url: ${S3_PUBLIC_BASE_URL:}
 hana:
   finance:
     autonomy-url: ${HANA_AUTONOMY_URL:https://www.hanafn.com}
