@@ -15,4 +15,6 @@ public interface DoodyCollectionRepository extends JpaRepository<DoodyCollection
     Optional<DoodyCollection> findByIdAndUser_Id(Long id, String userId);
 
     boolean existsByUser_IdAndDoodyTemplate_Id(String userId, String doodyTemplateId);
+
+    long countByUser_Id(String userId);
 }

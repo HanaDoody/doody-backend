@@ -49,6 +49,24 @@ public class AriSnapshot {
     @Column(nullable = false)
     private LocalDateTime timestamp;
 
+    public static AriSnapshot create(
+        User user,
+        BigDecimal rhythm,
+        BigDecimal autonomy,
+        BigDecimal connection,
+        String sourceType,
+        Long sourceId
+    ) {
+        AriSnapshot snapshot = new AriSnapshot();
+        snapshot.user = user;
+        snapshot.rhythm = rhythm;
+        snapshot.autonomy = autonomy;
+        snapshot.connection = connection;
+        snapshot.sourceType = sourceType;
+        snapshot.sourceId = sourceId;
+        return snapshot;
+    }
+
     @PrePersist
     void prePersist() {
         if (this.timestamp == null) {

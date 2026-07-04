@@ -11,14 +11,17 @@ import doody.spring.collection.dto.CollectionCaptureResponse.Contact;
 import doody.spring.collection.dto.CollectionCaptureResponse.Dudy;
 import doody.spring.collection.dto.CollectionCaptureResponse.Reward;
 import doody.spring.collection.dto.CollectionPinResponse;
+import doody.spring.domain.entity.AriSnapshot;
 import doody.spring.domain.entity.CollectionCapture;
 import doody.spring.domain.entity.CollectionPin;
 import doody.spring.domain.entity.DoodyTemplate;
 import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.AriSnapshotRepository;
 import doody.spring.domain.repository.CollectionCaptureRepository;
 import doody.spring.domain.repository.CollectionPinRepository;
+import doody.spring.domain.repository.DoodyCollectionRepository;
 import doody.spring.domain.repository.DoodyTemplateRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
@@ -26,7 +29,6 @@ import doody.spring.domain.repository.UserRepository;
 import doody.spring.common.service.RewardPersistenceService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -46,30 +48,36 @@ public class CollectionCaptureService {
     private final UserRepository userRepository;
     private final CollectionPinRepository collectionPinRepository;
     private final CollectionCaptureRepository collectionCaptureRepository;
+    private final DoodyCollectionRepository doodyCollectionRepository;
     private final DoodyTemplateRepository doodyTemplateRepository;
     private final RewardPersistenceService rewardPersistenceService;
     private final GoalRepository goalRepository;
     private final EnergyLogRepository energyLogRepository;
     private final AiCollectionCaptureClient aiCollectionCaptureClient;
+    private final AriSnapshotRepository ariSnapshotRepository;
 
     public CollectionCaptureService(
         UserRepository userRepository,
         CollectionPinRepository collectionPinRepository,
         CollectionCaptureRepository collectionCaptureRepository,
+        DoodyCollectionRepository doodyCollectionRepository,
         DoodyTemplateRepository doodyTemplateRepository,
         RewardPersistenceService rewardPersistenceService,
         GoalRepository goalRepository,
         EnergyLogRepository energyLogRepository,
-        AiCollectionCaptureClient aiCollectionCaptureClient
+        AiCollectionCaptureClient aiCollectionCaptureClient,
+        AriSnapshotRepository ariSnapshotRepository
     ) {
         this.userRepository = userRepository;
         this.collectionPinRepository = collectionPinRepository;
         this.collectionCaptureRepository = collectionCaptureRepository;
+        this.doodyCollectionRepository = doodyCollectionRepository;
         this.doodyTemplateRepository = doodyTemplateRepository;
         this.rewardPersistenceService = rewardPersistenceService;
         this.goalRepository = goalRepository;
         this.energyLogRepository = energyLogRepository;
         this.aiCollectionCaptureClient = aiCollectionCaptureClient;
+        this.ariSnapshotRepository = ariSnapshotRepository;
     }
 
     @Transactional
@@ -144,8 +152,9 @@ public class CollectionCaptureService {
             pin.getDoodyTemplate().getId(),
             pin.getDoodyTemplate().getTier(),
             pin.getDoodyTemplate().getAxis(),
-            "Captured nearby dudy."
+            "근처에서 발견한 두디야."
         );
+        long currentCollectionCount = doodyCollectionRepository.countByUser_Id(user.getId());
 
         AiCaptureResult aiResult = aiCollectionCaptureClient.capture(
             new AiCaptureRequest(
@@ -154,7 +163,8 @@ public class CollectionCaptureService {
                 new Location(request.lat(), request.lng()),
                 currentAri(user.getId()),
                 goalAri(user.getId()),
-                latestEnergy(user.getId())
+                latestEnergy(user.getId()),
+                currentCollectionCount
             ),
             fallbackDudy
         );
@@ -176,6 +186,7 @@ public class CollectionCaptureService {
         saveCollectedDudy(user, capture.getId(), aiResult.collectedDudy(), aiResult.dudy(), capturedTemplate);
         saveUnlockedContacts(user, capture.getId(), aiResult.unlockedContacts());
         updateGoalAri(user.getId(), aiResult.updatedAri());
+        saveAriSnapshot(user, capture.getId(), aiResult.updatedAri());
 
         return new CollectionCaptureResponse(
             capture.getId(),
@@ -258,6 +269,14 @@ public class CollectionCaptureService {
     }
 
     private AriVector currentAri(String userId) {
+        AriSnapshot snapshot = ariSnapshotRepository.findTopByUser_IdOrderByTimestampDesc(userId).orElse(null);
+        if (snapshot != null) {
+            return new AriVector(
+                snapshot.getRhythm().doubleValue(),
+                snapshot.getAutonomy().doubleValue(),
+                snapshot.getConnection().doubleValue()
+            );
+        }
         Goal goal = goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId).orElse(null);
         return new AriVector(
             goal == null || goal.getRhythm() == null ? 0.2 : goal.getRhythm().doubleValue(),
@@ -279,6 +298,29 @@ public class CollectionCaptureService {
         return energyLogRepository.findTopByUser_IdOrderByCreatedAtDesc(userId)
             .map(EnergyLog::getEnergy)
             .orElse((short) 4);
+    }
+
+    private void saveAriSnapshot(User user, Long captureId, AriVector updatedAri) {
+        if (updatedAri == null) {
+            return;
+        }
+        BigDecimal rhythmSeed = ariSnapshotRepository.findTopByUser_IdOrderByTimestampDesc(user.getId())
+            .map(AriSnapshot::getRhythm)
+            .orElseGet(() -> currentRhythmSeed(user.getId()));
+        ariSnapshotRepository.save(AriSnapshot.create(
+            user,
+            rhythmSeed,
+            toBigDecimal(updatedAri.autonomy()),
+            toBigDecimal(updatedAri.connection()),
+            "COLLECTION_CAPTURE",
+            captureId
+        ));
+    }
+
+    private BigDecimal currentRhythmSeed(String userId) {
+        return goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId)
+            .map(Goal::getRhythm)
+            .orElse(BigDecimal.valueOf(0.2));
     }
 
     private DoodyTemplate resolveTemplate(Dudy dudy, DoodyTemplate fallbackTemplate) {

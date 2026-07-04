@@ -2,10 +2,12 @@ package doody.spring.mission.service;
 
 import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.Goal;
+import doody.spring.domain.entity.AriSnapshot;
 import doody.spring.domain.entity.MissionLog;
 import doody.spring.domain.entity.MissionTemplate;
 import doody.spring.domain.entity.RhythmLog;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.AriSnapshotRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.MissionLogRepository;
@@ -42,6 +44,7 @@ public class MissionService {
     private final MissionLogRepository missionLogRepository;
     private final MissionTemplateRepository missionTemplateRepository;
     private final AiMissionRecommendClient aiMissionRecommendClient;
+    private final AriSnapshotRepository ariSnapshotRepository;
 
     public MissionService(
         UserRepository userRepository,
@@ -50,7 +53,8 @@ public class MissionService {
         RhythmLogRepository rhythmLogRepository,
         MissionLogRepository missionLogRepository,
         MissionTemplateRepository missionTemplateRepository,
-        AiMissionRecommendClient aiMissionRecommendClient
+        AiMissionRecommendClient aiMissionRecommendClient,
+        AriSnapshotRepository ariSnapshotRepository
     ) {
         this.userRepository = userRepository;
         this.goalRepository = goalRepository;
@@ -59,6 +63,7 @@ public class MissionService {
         this.missionLogRepository = missionLogRepository;
         this.missionTemplateRepository = missionTemplateRepository;
         this.aiMissionRecommendClient = aiMissionRecommendClient;
+        this.ariSnapshotRepository = ariSnapshotRepository;
     }
 
     @Transactional
@@ -149,6 +154,14 @@ public class MissionService {
     }
 
     private AriVector currentAri(Goal goal, String userId) {
+        AriSnapshot snapshot = ariSnapshotRepository.findTopByUser_IdOrderByTimestampDesc(userId).orElse(null);
+        if (snapshot != null) {
+            return new AriVector(
+                decimalOrDefault(snapshot.getRhythm(), 0.2),
+                decimalOrDefault(snapshot.getAutonomy(), 0.2),
+                decimalOrDefault(snapshot.getConnection(), 0.1)
+            );
+        }
         return new AriVector(
             decimalOrDefault(goal == null ? null : goal.getRhythm(), 0.2),
             decimalOrDefault(goal == null ? null : goal.getAutonomy(), 0.2),

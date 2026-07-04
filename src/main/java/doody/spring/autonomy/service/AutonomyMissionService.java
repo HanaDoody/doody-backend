@@ -8,12 +8,14 @@ import doody.spring.autonomy.dto.AutonomyMissionRejectResponse;
 import doody.spring.autonomy.dto.AutonomyMissionStartResponse;
 import doody.spring.autonomy.dto.AutonomyPathResponse;
 import doody.spring.autonomy.dto.AutonomyPathResponse.Node;
+import doody.spring.domain.entity.AriSnapshot;
 import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.MissionEvidence;
 import doody.spring.domain.entity.MissionLog;
 import doody.spring.domain.entity.MissionTemplate;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.AriSnapshotRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.MissionEvidenceRepository;
@@ -49,6 +51,7 @@ public class AutonomyMissionService {
     private final EnergyLogRepository energyLogRepository;
     private final RewardPersistenceService rewardPersistenceService;
     private final AiMissionActionClient aiMissionActionClient;
+    private final AriSnapshotRepository ariSnapshotRepository;
 
     public AutonomyMissionService(
         UserRepository userRepository,
@@ -58,7 +61,8 @@ public class AutonomyMissionService {
         GoalRepository goalRepository,
         EnergyLogRepository energyLogRepository,
         RewardPersistenceService rewardPersistenceService,
-        AiMissionActionClient aiMissionActionClient
+        AiMissionActionClient aiMissionActionClient,
+        AriSnapshotRepository ariSnapshotRepository
     ) {
         this.userRepository = userRepository;
         this.missionTemplateRepository = missionTemplateRepository;
@@ -68,6 +72,7 @@ public class AutonomyMissionService {
         this.energyLogRepository = energyLogRepository;
         this.rewardPersistenceService = rewardPersistenceService;
         this.aiMissionActionClient = aiMissionActionClient;
+        this.ariSnapshotRepository = ariSnapshotRepository;
     }
 
     @Transactional(readOnly = true)
@@ -185,6 +190,7 @@ public class AutonomyMissionService {
         log.complete();
 
         updateGoalAri(user.getId(), result.updatedAri());
+        saveAriSnapshot(user, log.getId(), result.updatedAri());
         saveReward(user, mission, log);
         saveCollectedDudy(user, log.getId(), result.collectedDudy());
         saveUnlockedContacts(user, log.getId(), result.unlockedContacts());
@@ -288,6 +294,14 @@ public class AutonomyMissionService {
     }
 
     private AriVector currentAri(String userId) {
+        AriSnapshot snapshot = ariSnapshotRepository.findTopByUser_IdOrderByTimestampDesc(userId).orElse(null);
+        if (snapshot != null) {
+            return new AriVector(
+                snapshot.getRhythm().doubleValue(),
+                snapshot.getAutonomy().doubleValue(),
+                snapshot.getConnection().doubleValue()
+            );
+        }
         Goal goal = goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId).orElse(null);
         return new AriVector(
             goal == null || goal.getRhythm() == null ? 0.2 : goal.getRhythm().doubleValue(),
@@ -300,6 +314,29 @@ public class AutonomyMissionService {
         return energyLogRepository.findTopByUser_IdOrderByCreatedAtDesc(userId)
             .map(EnergyLog::getEnergy)
             .orElse((short) 3);
+    }
+
+    private void saveAriSnapshot(User user, Long missionLogId, AriVector updatedAri) {
+        if (updatedAri == null) {
+            return;
+        }
+        BigDecimal rhythmSeed = ariSnapshotRepository.findTopByUser_IdOrderByTimestampDesc(user.getId())
+            .map(AriSnapshot::getRhythm)
+            .orElseGet(() -> currentRhythmSeed(user.getId()));
+        ariSnapshotRepository.save(AriSnapshot.create(
+            user,
+            rhythmSeed,
+            toBigDecimal(updatedAri.autonomy()),
+            toBigDecimal(updatedAri.connection()),
+            "MISSION_COMPLETE",
+            missionLogId
+        ));
+    }
+
+    private BigDecimal currentRhythmSeed(String userId) {
+        return goalRepository.findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId)
+            .map(Goal::getRhythm)
+            .orElse(BigDecimal.valueOf(0.2));
     }
 
     private void saveCollectedDudy(User user, Long missionLogId, List<Dudy> collectedDudy) {

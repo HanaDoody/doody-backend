@@ -6,9 +6,11 @@ import doody.spring.auth.dto.LoginRequest;
 import doody.spring.auth.dto.LoginResponse;
 import doody.spring.auth.dto.SignupRequest;
 import doody.spring.auth.dto.SignupResponse;
+import doody.spring.domain.entity.AriSnapshot;
 import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.OnboardingResponse;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.AriSnapshotRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.OnboardingResponseRepository;
 import doody.spring.domain.repository.UserRepository;
@@ -25,17 +27,20 @@ public class AuthService {
     private final UserRepository userRepository;
     private final OnboardingResponseRepository onboardingResponseRepository;
     private final GoalRepository goalRepository;
+    private final AriSnapshotRepository ariSnapshotRepository;
     private final AiOnboardingClient aiOnboardingClient;
 
     public AuthService(
         UserRepository userRepository,
         OnboardingResponseRepository onboardingResponseRepository,
         GoalRepository goalRepository,
+        AriSnapshotRepository ariSnapshotRepository,
         AiOnboardingClient aiOnboardingClient
     ) {
         this.userRepository = userRepository;
         this.onboardingResponseRepository = onboardingResponseRepository;
         this.goalRepository = goalRepository;
+        this.ariSnapshotRepository = ariSnapshotRepository;
         this.aiOnboardingClient = aiOnboardingClient;
     }
 
@@ -83,6 +88,14 @@ public class AuthService {
             BigDecimal.valueOf(initialAri.autonomy()),
             BigDecimal.valueOf(initialAri.connection())
         );
+        ariSnapshotRepository.save(AriSnapshot.create(
+            user,
+            BigDecimal.valueOf(initialAri.rhythm()),
+            BigDecimal.valueOf(initialAri.autonomy()),
+            BigDecimal.valueOf(initialAri.connection()),
+            "ONBOARDING",
+            onboardingResponse.getId()
+        ));
 
         return SignupResponse.from(
             user,

@@ -9,4 +9,6 @@ public interface ContactUnlockRepository extends JpaRepository<ContactUnlock, Lo
     boolean existsByUser_IdAndContactId(String userId, String contactId);
 
     Optional<ContactUnlock> findByUser_IdAndContactId(String userId, String contactId);
+
+    Optional<ContactUnlock> findTopByUser_IdAndAxisIgnoreCaseOrderByUnlockedAtDesc(String userId, String axis);
 }
