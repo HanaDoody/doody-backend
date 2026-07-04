@@ -47,10 +47,49 @@ jobs:
             -o UserKnownHostsFile=/dev/null \
             "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}" << 'EOF'
             set -e
+
+            if ! id -u doody >/dev/null 2>&1; then
+              sudo useradd -r -s /usr/sbin/nologin doody
+            fi
+
             sudo mkdir -p /opt/doody
             sudo mv /tmp/doody-backend.jar /opt/doody/app.jar
-            sudo chown -R doody:doody /opt/doody || true
+            sudo tee /opt/doody/.env > /dev/null << 'ENVEOF'
+          SPRING_PROFILES_ACTIVE=prod
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          AI_ENGINE_BASE_URL=${{ secrets.AI_ENGINE_BASE_URL }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          S3_BUCKET=${{ secrets.S3_BUCKET }}
+          S3_PUBLIC_BASE_URL=${{ secrets.S3_PUBLIC_BASE_URL }}
+          HANA_AUTONOMY_URL=${{ secrets.HANA_AUTONOMY_URL }}
+          HANA_CONNECTION_URL=${{ secrets.HANA_CONNECTION_URL }}
+          ENVEOF
+
+            sudo tee /etc/systemd/system/doody-backend.service > /dev/null << 'SERVICEEOF'
+          [Unit]
+          Description=Doody Spring Backend
+          After=network.target
+
+          [Service]
+          User=doody
+          WorkingDirectory=/opt/doody
+          EnvironmentFile=/opt/doody/.env
+          ExecStart=/usr/bin/java -jar /opt/doody/app.jar
+          SuccessExitStatus=143
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICEEOF
+
+            sudo chown -R doody:doody /opt/doody
+            sudo chmod 600 /opt/doody/.env
             sudo systemctl daemon-reload
+            sudo systemctl enable doody-backend
             sudo systemctl restart doody-backend
             sudo systemctl status doody-backend --no-pager
           EOF
