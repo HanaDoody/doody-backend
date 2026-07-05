@@ -1,9 +1,11 @@
 package doody.spring.report.service;
 
+import doody.spring.domain.entity.CollectionCapture;
 import doody.spring.domain.entity.MissionLog;
 import doody.spring.domain.entity.ReportSummary;
 import doody.spring.domain.entity.RhythmLog;
 import doody.spring.domain.entity.User;
+import doody.spring.domain.repository.CollectionCaptureRepository;
 import doody.spring.domain.repository.MissionLogRepository;
 import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.ReportSummaryRepository;
@@ -45,6 +47,7 @@ public class ReportService {
     private final ReportSummaryRepository reportSummaryRepository;
     private final RhythmLogRepository rhythmLogRepository;
     private final MissionLogRepository missionLogRepository;
+    private final CollectionCaptureRepository collectionCaptureRepository;
     private final PointTransactionRepository pointTransactionRepository;
     private final AiReportSummaryClient aiReportSummaryClient;
 
@@ -53,6 +56,7 @@ public class ReportService {
         ReportSummaryRepository reportSummaryRepository,
         RhythmLogRepository rhythmLogRepository,
         MissionLogRepository missionLogRepository,
+        CollectionCaptureRepository collectionCaptureRepository,
         PointTransactionRepository pointTransactionRepository,
         AiReportSummaryClient aiReportSummaryClient
     ) {
@@ -60,6 +64,7 @@ public class ReportService {
         this.reportSummaryRepository = reportSummaryRepository;
         this.rhythmLogRepository = rhythmLogRepository;
         this.missionLogRepository = missionLogRepository;
+        this.collectionCaptureRepository = collectionCaptureRepository;
         this.pointTransactionRepository = pointTransactionRepository;
         this.aiReportSummaryClient = aiReportSummaryClient;
     }
@@ -117,6 +122,24 @@ public class ReportService {
                     missionLog.getMissionTemplate().getReward(),
                     recordDate,
                     missionLog.getCompletedAt()
+                )
+            ));
+        }
+
+        List<CollectionCapture> collectionCaptures =
+            collectionCaptureRepository.findByUser_IdAndCapturedAtBetweenOrderByCapturedAtDesc(userId, startAt, endAt);
+        for (CollectionCapture capture : collectionCaptures) {
+            LocalDate recordDate = capture.getCapturedAt().toLocalDate();
+            recordedDays.add(recordDate);
+            records.add(new RecordWithAxis(
+                "CONNECTION",
+                new RecordItem(
+                    "COLLECTION_CAPTURE",
+                    capture.getId(),
+                    resolveCollectionCaptureTitle(capture),
+                    capture.getReward(),
+                    recordDate,
+                    capture.getCapturedAt()
                 )
             ));
         }
@@ -293,6 +316,14 @@ public class ReportService {
             return rhythmLog.getText();
         }
         return rhythmLog.getRhythmType();
+    }
+
+    private String resolveCollectionCaptureTitle(CollectionCapture capture) {
+        if (capture.getDoodyTemplate() != null && capture.getDoodyTemplate().getName() != null
+            && !capture.getDoodyTemplate().getName().isBlank()) {
+            return capture.getDoodyTemplate().getName();
+        }
+        return "두디 포획";
     }
 
     private String normalizeAxis(String axis) {
