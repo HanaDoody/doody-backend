@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -22,9 +23,12 @@ public class AiMissionRecommendClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiMissionRecommendClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
+    public AiMissionRecommendClient(
+        @Value("${AI_ENGINE_BASE_URL:}") String baseUrl,
+        @Qualifier("aiEngineRestClient") RestClient restClient
+    ) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClient;
     }
 
     public TodayMissionResponse recommend(AiMissionRecommendRequest request, Mission fallbackMission) {

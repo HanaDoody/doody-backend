@@ -3,6 +3,7 @@ package doody.spring.mission.client;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import doody.spring.mission.dto.TodayMissionResponse.AriVector;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -13,9 +14,12 @@ public class AiMissionActionClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiMissionActionClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
+    public AiMissionActionClient(
+        @Value("${AI_ENGINE_BASE_URL:}") String baseUrl,
+        @Qualifier("aiEngineRestClient") RestClient restClient
+    ) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClient;
     }
 
     public MissionCompleteResult complete(MissionCompleteRequest request) {
@@ -59,7 +63,7 @@ public class AiMissionActionClient {
             Math.min((request.currentAri() == null ? 0.2 : request.currentAri().autonomy()) + 0.03, 1.0),
             request.currentAri() == null ? 0.1 : request.currentAri().connection()
         );
-        return new MissionCompleteResult(updated, delta, 1.0, true, false, false, false, List.of(), List.of(), "좋아. 작은 행동 하나가 오늘의 자율감을 조금 열었어.");
+        return new MissionCompleteResult(updated, delta, 1.0, new Reward(0), true, false, false, false, List.of(), List.of(), "좋아. 작은 행동 하나가 오늘의 자율감을 조금 열었어.");
     }
 
     private MissionRejectResult fallbackReject(MissionRejectAiRequest request) {
@@ -89,6 +93,7 @@ public class AiMissionActionClient {
         @JsonProperty("applied_delta")
         AriVector appliedDelta,
         Double eta,
+        Reward reward,
         Boolean completed,
         @JsonProperty("signature_available")
         Boolean signatureAvailable,
@@ -101,6 +106,12 @@ public class AiMissionActionClient {
         @JsonProperty("unlocked_contacts")
         List<Contact> unlockedContacts,
         String message
+    ) {
+    }
+
+    public record Reward(
+        @JsonProperty("hana_money")
+        Integer hanaMoney
     ) {
     }
 
@@ -119,8 +130,37 @@ public class AiMissionActionClient {
         String message,
         @JsonProperty("rest_option")
         Boolean restOption,
-        List<Object> candidates,
+        List<MissionCandidate> candidates,
         RejectDiagnostics diagnostics
+    ) {
+    }
+
+    public record MissionCandidate(
+        String id,
+        @JsonProperty("mission_id")
+        String missionId,
+        String axis,
+        Integer stage,
+        String waypoint,
+        Integer difficulty,
+        AriVector delta,
+        String title,
+        String description,
+        @JsonProperty("mission_type")
+        String missionType,
+        @JsonProperty("required_count")
+        Integer requiredCount,
+        @JsonProperty("is_signature")
+        Boolean signature,
+        @JsonProperty("is_fallback")
+        Boolean fallback,
+        @JsonProperty("fallback_mission_id")
+        String fallbackMissionId,
+        @JsonProperty("goal_tags")
+        List<String> goalTags,
+        @JsonProperty("how_to")
+        List<String> howTo,
+        String reason
     ) {
     }
 

@@ -6,6 +6,7 @@ import doody.spring.domain.type.RecommendedPeriod;
 import doody.spring.mission.dto.TodayMissionResponse.AriVector;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -18,9 +19,12 @@ public class AiOnboardingClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiOnboardingClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
+    public AiOnboardingClient(
+        @Value("${AI_ENGINE_BASE_URL:}") String baseUrl,
+        @Qualifier("aiEngineRestClient") RestClient restClient
+    ) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClient;
     }
 
     public AiOnboardingResult onboard(String userId, SignupRequest request) {

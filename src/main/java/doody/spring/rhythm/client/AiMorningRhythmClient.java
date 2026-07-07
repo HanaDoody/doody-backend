@@ -5,6 +5,7 @@ import doody.spring.rhythm.dto.MorningRhythmResponse.CollectedDudy;
 import doody.spring.rhythm.dto.MorningRhythmResponse.Reward;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -15,9 +16,12 @@ public class AiMorningRhythmClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiMorningRhythmClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
+    public AiMorningRhythmClient(
+        @Value("${AI_ENGINE_BASE_URL:}") String baseUrl,
+        @Qualifier("aiEngineRestClient") RestClient restClient
+    ) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClient;
     }
 
     public AiMorningResult checkIn(String userId, LocalDateTime timestamp, Short energy) {

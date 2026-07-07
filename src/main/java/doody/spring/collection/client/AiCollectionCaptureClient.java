@@ -8,6 +8,7 @@ import doody.spring.collection.dto.CollectionCaptureResponse.Dudy;
 import doody.spring.collection.dto.CollectionCaptureResponse.Reward;
 import java.math.BigDecimal;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -18,9 +19,12 @@ public class AiCollectionCaptureClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiCollectionCaptureClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
+    public AiCollectionCaptureClient(
+        @Value("${AI_ENGINE_BASE_URL:}") String baseUrl,
+        @Qualifier("aiEngineRestClient") RestClient restClient
+    ) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClient;
     }
 
     public AiCaptureResult capture(AiCaptureRequest request, Dudy fallbackDudy) {

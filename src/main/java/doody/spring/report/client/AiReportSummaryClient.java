@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -18,9 +19,12 @@ public class AiReportSummaryClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiReportSummaryClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
+    public AiReportSummaryClient(
+        @Value("${AI_ENGINE_BASE_URL:}") String baseUrl,
+        @Qualifier("aiEngineRestClient") RestClient restClient
+    ) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClient;
     }
 
     public ActivitySummary summarize(String userId, String period, ReportSummaryStats stats) {

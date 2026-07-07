@@ -2,6 +2,7 @@ package doody.spring.chat.client;
 
 import doody.spring.chat.dto.ChatMessageRequest;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -12,9 +13,12 @@ public class AiChatClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiChatClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
+    public AiChatClient(
+        @Value("${AI_ENGINE_BASE_URL:}") String baseUrl,
+        @Qualifier("aiEngineRestClient") RestClient restClient
+    ) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClient;
     }
 
     public AiChatResponse message(ChatMessageRequest request) {

@@ -12,5 +12,8 @@ public interface CollectionPinRepository extends JpaRepository<CollectionPin, St
     List<CollectionPin> findByActiveTrue();
 
     @EntityGraph(attributePaths = "doodyTemplate")
+    List<CollectionPin> findByActiveTrueAndDoodyTemplate_Id(String doodyTemplateId);
+
+    @EntityGraph(attributePaths = "doodyTemplate")
     Optional<CollectionPin> findByIdAndActiveTrue(String id);
 }
