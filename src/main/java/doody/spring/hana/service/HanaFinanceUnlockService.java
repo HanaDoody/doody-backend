@@ -133,15 +133,13 @@ public class HanaFinanceUnlockService {
 
     private DoodyCollection findCollectedRareDoody(String userId, AxisMeta meta) {
         return doodyCollectionRepository.findByUser_IdOrderByCollectedAtDesc(userId).stream()
-            .filter(collection -> meta.rareDoodyId().equals(collection.getDoodyTemplate().getId())
-                || ("rare".equalsIgnoreCase(collection.getTier()) && meta.axis().equalsIgnoreCase(collection.getAxis())))
+            .filter(collection -> meta.rareDoodyId().equals(collection.getDoodyTemplate().getId()))
             .findFirst()
             .orElse(null);
     }
 
     private DoodyTemplate resolveRareDoodyTemplate(AxisMeta meta) {
         return doodyTemplateRepository.findById(meta.rareDoodyId())
-            .or(() -> doodyTemplateRepository.findFirstByTierIgnoreCaseAndAxisIgnoreCaseAndActiveTrue("rare", meta.axis()))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "rare doody template not found."));
     }
 
