@@ -5,6 +5,7 @@ import doody.spring.autonomy.dto.AutonomyMissionDetailResponse;
 import doody.spring.autonomy.dto.AutonomyMissionEvidenceResponse;
 import doody.spring.autonomy.dto.AutonomyMissionRejectRequest;
 import doody.spring.autonomy.dto.AutonomyMissionRejectResponse;
+import doody.spring.autonomy.dto.AutonomyMissionCompleteResponse.Reward;
 import doody.spring.autonomy.dto.AutonomyMissionStartResponse;
 import doody.spring.autonomy.dto.AutonomyPathResponse;
 import doody.spring.autonomy.dto.AutonomyPathResponse.Node;
@@ -28,9 +29,11 @@ import doody.spring.mission.client.AiMissionActionClient.Contact;
 import doody.spring.mission.client.AiMissionActionClient.Dudy;
 import doody.spring.mission.client.AiMissionActionClient.MissionCompleteRequest;
 import doody.spring.mission.client.AiMissionActionClient.MissionCompleteResult;
+import doody.spring.mission.client.AiMissionActionClient.MissionCandidate;
 import doody.spring.mission.client.AiMissionActionClient.MissionRejectAiRequest;
 import doody.spring.mission.client.AiMissionActionClient.MissionRejectResult;
 import doody.spring.mission.dto.TodayMissionResponse.AriVector;
+import doody.spring.mission.dto.TodayMissionResponse.Mission;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -133,7 +136,8 @@ public class AutonomyMissionService {
             mission.getId(),
             result.action(),
             result.message(),
-            result.restOption()
+            result.restOption(),
+            toMissions(result.candidates())
         );
     }
 
@@ -191,7 +195,8 @@ public class AutonomyMissionService {
 
         updateGoalAri(user.getId(), result.updatedAri());
         saveAriSnapshot(user, log.getId(), result.updatedAri());
-        saveReward(user, mission, log);
+        Integer rewardAmount = rewardAmount(result, mission);
+        saveReward(user, rewardAmount, mission.getTitle(), log);
         saveCollectedDudy(user, log.getId(), result.collectedDudy());
         saveUnlockedContacts(user, log.getId(), result.unlockedContacts());
 
@@ -201,7 +206,7 @@ public class AutonomyMissionService {
             result.updatedAri(),
             result.appliedDelta(),
             result.eta(),
-            mission.getReward(),
+            new Reward(rewardAmount),
             result.completed(),
             result.signatureAvailable(),
             result.signatureCompleted(),
@@ -273,12 +278,50 @@ public class AutonomyMissionService {
         return mission;
     }
 
-    private void saveReward(User user, MissionTemplate mission, MissionLog log) {
-        Integer reward = mission.getReward();
+    private Integer rewardAmount(MissionCompleteResult result, MissionTemplate mission) {
+        Integer aiReward = result.reward() == null ? null : result.reward().hanaMoney();
+        return aiReward == null ? mission.getReward() : aiReward;
+    }
+
+    private void saveReward(User user, Integer reward, String reason, MissionLog log) {
         if (reward == null || reward <= 0) {
             return;
         }
-        rewardPersistenceService.earnPoint(user, reward, mission.getTitle(), "MISSION", log.getId());
+        rewardPersistenceService.earnPoint(user, reward, reason, "MISSION", log.getId());
+    }
+
+    private List<Mission> toMissions(List<MissionCandidate> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        return candidates.stream()
+            .map(this::toMission)
+            .toList();
+    }
+
+    private Mission toMission(MissionCandidate candidate) {
+        String missionId = candidate.missionId() == null || candidate.missionId().isBlank()
+            ? candidate.id()
+            : candidate.missionId();
+        return new Mission(
+            candidate.id(),
+            missionId,
+            candidate.axis(),
+            candidate.stage(),
+            candidate.waypoint(),
+            candidate.difficulty(),
+            candidate.delta(),
+            candidate.title(),
+            candidate.description(),
+            candidate.missionType(),
+            candidate.requiredCount(),
+            candidate.signature(),
+            candidate.fallback(),
+            candidate.fallbackMissionId(),
+            candidate.goalTags() == null ? List.of() : candidate.goalTags(),
+            candidate.howTo() == null ? List.of() : candidate.howTo(),
+            candidate.reason()
+        );
     }
 
     private void updateGoalAri(String userId, AriVector updatedAri) {

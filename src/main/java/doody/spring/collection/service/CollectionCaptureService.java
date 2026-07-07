@@ -44,6 +44,7 @@ public class CollectionCaptureService {
     private static final double CAPTURE_DISTANCE_METER = 100.0;
     private static final double RANDOM_PIN_RADIUS_METER = 90.0;
     private static final int DEFAULT_PIN_COUNT = 5;
+    private static final String MAP_DOODY_TEMPLATE_ID = "d_connection_common_002";
 
     private final UserRepository userRepository;
     private final CollectionPinRepository collectionPinRepository;
@@ -97,7 +98,7 @@ public class CollectionCaptureService {
     }
 
     private List<CollectionPinResponse> nearbyPinResponses(BigDecimal lat, BigDecimal lng, double radius) {
-        return collectionPinRepository.findByActiveTrue().stream()
+        return collectionPinRepository.findByActiveTrueAndDoodyTemplate_Id(MAP_DOODY_TEMPLATE_ID).stream()
             .map(pin -> toPinResponse(pin, lat, lng))
             .filter(pin -> pin.distanceMeter() <= radius)
             .sorted(Comparator.comparing(CollectionPinResponse::distanceMeter))
@@ -105,16 +106,18 @@ public class CollectionCaptureService {
     }
 
     private void generateRandomPins(BigDecimal lat, BigDecimal lng, int count) {
-        List<DoodyTemplate> templates = doodyTemplateRepository.findByActiveTrue();
-        if (templates.isEmpty() || count <= 0) {
+        if (count <= 0) {
+            return;
+        }
+        DoodyTemplate template = doodyTemplateRepository.findById(MAP_DOODY_TEMPLATE_ID).orElse(null);
+        if (template == null || !Boolean.TRUE.equals(template.getActive())) {
             return;
         }
 
         for (int i = 0; i < count; i++) {
-            DoodyTemplate template = templates.get(ThreadLocalRandom.current().nextInt(templates.size()));
             RandomPoint point = randomPointNear(lat.doubleValue(), lng.doubleValue());
             collectionPinRepository.save(CollectionPin.createRandom(
-                template.getName() + " 발견 지점",
+                template.getName() + " discovery",
                 toCoordinate(point.lat()),
                 toCoordinate(point.lng()),
                 template
@@ -152,7 +155,7 @@ public class CollectionCaptureService {
             pin.getDoodyTemplate().getId(),
             pin.getDoodyTemplate().getTier(),
             pin.getDoodyTemplate().getAxis(),
-            "근처에서 발견한 두디야."
+            "Nearby discovery doody."
         );
         long currentCollectionCount = doodyCollectionRepository.countByUser_Id(user.getId());
 

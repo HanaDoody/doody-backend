@@ -11,7 +11,7 @@ public record AutonomyMissionCompleteResponse(
     AriVector updatedAri,
     AriVector appliedDelta,
     Double eta,
-    Integer reward,
+    Reward reward,
     Boolean completed,
     Boolean signatureAvailable,
     Boolean signatureCompleted,
@@ -20,4 +20,8 @@ public record AutonomyMissionCompleteResponse(
     List<Contact> unlockedContacts,
     String message
 ) {
+    public record Reward(
+        Integer hanaMoney
+    ) {
+    }
 }
