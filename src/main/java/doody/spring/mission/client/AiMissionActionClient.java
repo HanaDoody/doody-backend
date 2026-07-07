@@ -3,6 +3,7 @@ package doody.spring.mission.client;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import doody.spring.mission.dto.TodayMissionResponse.AriVector;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -13,9 +14,12 @@ public class AiMissionActionClient {
     private final String baseUrl;
     private final RestClient restClient;
 
-    public AiMissionActionClient(@Value("${AI_ENGINE_BASE_URL:}") String baseUrl) {
+    public AiMissionActionClient(
+        @Value("${AI_ENGINE_BASE_URL:}") String baseUrl,
+        @Qualifier("aiEngineRestClient") RestClient restClient
+    ) {
         this.baseUrl = baseUrl == null ? "" : baseUrl.strip();
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClient;
     }
 
     public MissionCompleteResult complete(MissionCompleteRequest request) {
