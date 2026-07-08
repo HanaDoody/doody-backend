@@ -78,7 +78,7 @@ public class AuthService {
             request.autonomyGoal(),
             request.connectionGoal(),
             aiResult.period(),
-            request.firstStepMission()
+            aiResult.firstStepMission()
         ));
 
         AriVector initialAri = aiResult.initialAri();
@@ -142,9 +142,6 @@ public class AuthService {
         }
         if (request.connectionGoal() == null || request.connectionGoal().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "connectionGoal is required.");
-        }
-        if (request.firstStepMission() == null || request.firstStepMission().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "firstStepMission is required.");
         }
     }
 
