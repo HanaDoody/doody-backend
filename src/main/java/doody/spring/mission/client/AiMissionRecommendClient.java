@@ -209,6 +209,7 @@ public class AiMissionRecommendClient {
         String missionId,
         String axis,
         String title,
+        String status,
         @JsonProperty("completed_at")
         LocalDateTime completedAt
     ) {
