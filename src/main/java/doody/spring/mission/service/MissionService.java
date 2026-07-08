@@ -202,10 +202,35 @@ public class MissionService {
     private MissionHistory toMissionHistory(MissionLog log) {
         return new MissionHistory(
             log.getMissionTemplate().getId(),
-            log.getMissionTemplate().getAxis(),
+            normalizeHistoryAxis(log.getMissionTemplate().getAxis()),
             log.getMissionTemplate().getTitle(),
+            missionStatus(log),
             log.getCompletedAt()
         );
+    }
+
+    private String normalizeHistoryAxis(String axis) {
+        String normalized = normalize(axis);
+        if ("AUTONOMY".equals(normalized)) {
+            return "autonomy";
+        }
+        if ("CONNECTION".equals(normalized)) {
+            return "connection";
+        }
+        return normalized == null ? null : normalized.toLowerCase();
+    }
+
+    private String missionStatus(MissionLog log) {
+        if (log.getCompletedAt() != null) {
+            return "completed";
+        }
+        if (log.getSkippedAt() != null) {
+            return "rejected";
+        }
+        if (log.getStartedAt() != null) {
+            return "started";
+        }
+        return "recommended";
     }
 
     private Mission fallbackMission() {
