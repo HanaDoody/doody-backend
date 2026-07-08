@@ -8,6 +8,7 @@ public final class RhythmTextNormalizer {
 
     private static final String MORNING_DEFAULT_TITLE = "오늘 아침 리듬이 기록됐어.";
     private static final String EVENING_DEFAULT_TITLE = "오늘 저녁 회고가 기록됐어.";
+    private static final String UNKNOWN_MORNING_MOOD = "확인 안 됨";
     private static final Set<String> EVENING_PLACEHOLDER_KEYS = Set.of(
         "night_mood_default",
         "evening_mood_default"
@@ -34,6 +35,17 @@ public final class RhythmTextNormalizer {
         }
 
         return title;
+    }
+
+    public static String reportRhythmTitle(String rhythmType, String text, Short energy) {
+        String normalizedType = rhythmType == null ? "" : rhythmType.toUpperCase(Locale.ROOT);
+        if ("MORNING".equals(normalizedType)) {
+            return "그날의 에너지: " + (energy == null ? UNKNOWN_MORNING_MOOD : energy);
+        }
+        if ("EVENING".equals(normalizedType)) {
+            return "그날의 한마디: " + normalizeRhythmTitle(normalizedType, text);
+        }
+        return normalizeRhythmTitle(normalizedType, text);
     }
 
     private static String defaultTitle(String rhythmType) {
