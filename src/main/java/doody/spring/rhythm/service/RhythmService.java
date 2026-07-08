@@ -13,6 +13,7 @@ import doody.spring.domain.repository.MissionLogRepository;
 import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.RhythmLogRepository;
 import doody.spring.domain.repository.UserRepository;
+import doody.spring.common.util.RhythmTextNormalizer;
 import doody.spring.rhythm.client.AiEveningRhythmClient;
 import doody.spring.rhythm.client.AiEveningRhythmClient.AiEveningResult;
 import doody.spring.rhythm.client.AiMorningRhythmClient;
@@ -117,11 +118,12 @@ public class RhythmService {
         validateMorningChecked(user.getId(), timestamp);
         validateNotDuplicateRhythm(user.getId(), "EVENING", timestamp);
         AiEveningResult aiResult = aiEveningRhythmClient.leaveNote(user.getId(), timestamp, request.text());
+        String eveningText = RhythmTextNormalizer.normalizeRhythmTitle("EVENING", request.text());
 
         RhythmLog rhythmLog = rhythmLogRepository.save(RhythmLog.createEvening(
             user,
             timestamp,
-            request.text(),
+            eveningText,
             aiResult.signals(),
             aiResult.hanaMoney()
         ));
