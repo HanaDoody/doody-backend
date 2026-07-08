@@ -1,11 +1,13 @@
 package doody.spring.report.service;
 
 import doody.spring.domain.entity.CollectionCapture;
+import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.MissionLog;
 import doody.spring.domain.entity.ReportSummary;
 import doody.spring.domain.entity.RhythmLog;
 import doody.spring.domain.entity.User;
 import doody.spring.domain.repository.CollectionCaptureRepository;
+import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.MissionLogRepository;
 import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.ReportSummaryRepository;
@@ -33,7 +35,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +51,7 @@ public class ReportService {
     private final UserRepository userRepository;
     private final ReportSummaryRepository reportSummaryRepository;
     private final RhythmLogRepository rhythmLogRepository;
+    private final EnergyLogRepository energyLogRepository;
     private final MissionLogRepository missionLogRepository;
     private final CollectionCaptureRepository collectionCaptureRepository;
     private final PointTransactionRepository pointTransactionRepository;
@@ -56,6 +61,7 @@ public class ReportService {
         UserRepository userRepository,
         ReportSummaryRepository reportSummaryRepository,
         RhythmLogRepository rhythmLogRepository,
+        EnergyLogRepository energyLogRepository,
         MissionLogRepository missionLogRepository,
         CollectionCaptureRepository collectionCaptureRepository,
         PointTransactionRepository pointTransactionRepository,
@@ -64,6 +70,7 @@ public class ReportService {
         this.userRepository = userRepository;
         this.reportSummaryRepository = reportSummaryRepository;
         this.rhythmLogRepository = rhythmLogRepository;
+        this.energyLogRepository = energyLogRepository;
         this.missionLogRepository = missionLogRepository;
         this.collectionCaptureRepository = collectionCaptureRepository;
         this.pointTransactionRepository = pointTransactionRepository;
@@ -93,6 +100,7 @@ public class ReportService {
         Set<LocalDate> recordedDays = new HashSet<>();
 
         List<RhythmLog> rhythmLogs = rhythmLogRepository.findByUser_IdAndTimestampBetweenOrderByTimestampDesc(userId, startAt, endAt);
+        Map<Long, Short> energyByRhythmLogId = findEnergyByRhythmLogId(rhythmLogs);
         for (RhythmLog rhythmLog : rhythmLogs) {
             LocalDate recordDate = rhythmLog.getTimestamp().toLocalDate();
             recordedDays.add(recordDate);
@@ -101,7 +109,7 @@ public class ReportService {
                 new RecordItem(
                     "RHYTHM_LOG",
                     rhythmLog.getId(),
-                    resolveRhythmTitle(rhythmLog),
+                    resolveRhythmTitle(rhythmLog, energyByRhythmLogId.get(rhythmLog.getId())),
                     rhythmLog.getReward(),
                     recordDate,
                     rhythmLog.getTimestamp()
@@ -312,8 +320,27 @@ public class ReportService {
             .count();
     }
 
-    private String resolveRhythmTitle(RhythmLog rhythmLog) {
-        return RhythmTextNormalizer.normalizeRhythmTitle(rhythmLog.getRhythmType(), rhythmLog.getText());
+    private Map<Long, Short> findEnergyByRhythmLogId(List<RhythmLog> rhythmLogs) {
+        List<Long> morningRhythmLogIds = rhythmLogs.stream()
+            .filter(rhythmLog -> "MORNING".equals(rhythmLog.getRhythmType()))
+            .map(RhythmLog::getId)
+            .filter(Objects::nonNull)
+            .toList();
+        if (morningRhythmLogIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return energyLogRepository.findByRhythmLog_IdIn(morningRhythmLogIds).stream()
+            .filter(energyLog -> energyLog.getRhythmLog() != null && energyLog.getRhythmLog().getId() != null)
+            .collect(Collectors.toMap(
+                energyLog -> energyLog.getRhythmLog().getId(),
+                EnergyLog::getEnergy,
+                (first, second) -> first
+            ));
+    }
+
+    private String resolveRhythmTitle(RhythmLog rhythmLog, Short energy) {
+        return RhythmTextNormalizer.reportRhythmTitle(rhythmLog.getRhythmType(), rhythmLog.getText(), energy);
     }
 
     private String resolveCollectionCaptureTitle(CollectionCapture capture) {

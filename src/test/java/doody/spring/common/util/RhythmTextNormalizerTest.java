@@ -35,4 +35,16 @@ class RhythmTextNormalizerTest {
         assertThat(RhythmTextNormalizer.normalizeRhythmTitle("EVENING", "night_mood_defaulted text"))
             .isEqualTo("night_mood_defaulted text");
     }
+
+    @Test
+    void formatsMorningReportTitleWithEnergy() {
+        assertThat(RhythmTextNormalizer.reportRhythmTitle("MORNING", "좋아. 오늘 아침 리듬이 기록됐어.", (short) 4))
+            .isEqualTo("그날의 에너지: 4");
+    }
+
+    @Test
+    void formatsEveningReportTitleWithOneLineNote() {
+        assertThat(RhythmTextNormalizer.reportRhythmTitle("EVENING", "night_mood_default. kk", null))
+            .isEqualTo("그날의 한마디: kk");
+    }
 }
