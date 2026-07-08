@@ -11,6 +11,7 @@ import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.ReportSummaryRepository;
 import doody.spring.domain.repository.RhythmLogRepository;
 import doody.spring.domain.repository.UserRepository;
+import doody.spring.common.util.RhythmTextNormalizer;
 import doody.spring.report.client.AiReportSummaryClient;
 import doody.spring.report.client.AiReportSummaryClient.RecentMission;
 import doody.spring.report.client.AiReportSummaryClient.ReportSummaryStats;
@@ -312,10 +313,7 @@ public class ReportService {
     }
 
     private String resolveRhythmTitle(RhythmLog rhythmLog) {
-        if (rhythmLog.getText() != null && !rhythmLog.getText().isBlank()) {
-            return rhythmLog.getText();
-        }
-        return rhythmLog.getRhythmType();
+        return RhythmTextNormalizer.normalizeRhythmTitle(rhythmLog.getRhythmType(), rhythmLog.getText());
     }
 
     private String resolveCollectionCaptureTitle(CollectionCapture capture) {
