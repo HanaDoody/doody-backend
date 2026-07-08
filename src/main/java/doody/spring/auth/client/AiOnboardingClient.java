@@ -44,7 +44,7 @@ public class AiOnboardingClient {
             normalizeAri(complete.initialAri(), fallbackInitialAri(request)),
             normalizeAri(complete.goal(), new AriVector(0.8, 0.8, 0.4)),
             complete.startAxis(),
-            complete.firstStepMission(),
+            fallbackFirstStepMission(request),
             complete.planSummary(),
             complete.diagnostics(),
             baseUrl.isBlank() ? "FALLBACK" : "AI"
@@ -100,7 +100,6 @@ public class AiOnboardingClient {
             new AriVector(0.8, 0.8, 0.4),
             period.getValue(),
             "rhythm",
-            fallbackFirstStepMission(request),
             "먼저 리듬을 잡고, 자립과 연결로 천천히 이어가자.",
             Map.of("source", "fallback")
         );
@@ -279,8 +278,6 @@ public class AiOnboardingClient {
         String period,
         @JsonProperty("start_axis")
         String startAxis,
-        @JsonProperty("first_step_mission")
-        String firstStepMission,
         @JsonProperty("plan_summary")
         String planSummary,
         Map<String, Object> diagnostics
@@ -291,7 +288,6 @@ public class AiOnboardingClient {
                 goal == null ? fallback.goal() : goal,
                 period == null || period.isBlank() ? fallback.period() : period,
                 startAxis == null || startAxis.isBlank() ? fallback.startAxis() : startAxis,
-                firstStepMission == null || firstStepMission.isBlank() ? fallback.firstStepMission() : firstStepMission,
                 planSummary == null || planSummary.isBlank() ? fallback.planSummary() : planSummary,
                 diagnostics == null ? fallback.diagnostics() : diagnostics
             );
