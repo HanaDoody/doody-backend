@@ -14,8 +14,14 @@ import doody.spring.domain.repository.AriSnapshotRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.OnboardingResponseRepository;
 import doody.spring.domain.repository.UserRepository;
+import doody.spring.mission.client.AiMissionRecommendClient;
+import doody.spring.mission.client.AiMissionRecommendClient.AiMissionRecommendRequest;
+import doody.spring.mission.client.AiMissionRecommendClient.RhythmHistory;
+import doody.spring.mission.dto.TodayMissionResponse;
 import doody.spring.mission.dto.TodayMissionResponse.AriVector;
+import doody.spring.mission.dto.TodayMissionResponse.Mission;
 import java.math.BigDecimal;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,19 +35,22 @@ public class AuthService {
     private final GoalRepository goalRepository;
     private final AriSnapshotRepository ariSnapshotRepository;
     private final AiOnboardingClient aiOnboardingClient;
+    private final AiMissionRecommendClient aiMissionRecommendClient;
 
     public AuthService(
         UserRepository userRepository,
         OnboardingResponseRepository onboardingResponseRepository,
         GoalRepository goalRepository,
         AriSnapshotRepository ariSnapshotRepository,
-        AiOnboardingClient aiOnboardingClient
+        AiOnboardingClient aiOnboardingClient,
+        AiMissionRecommendClient aiMissionRecommendClient
     ) {
         this.userRepository = userRepository;
         this.onboardingResponseRepository = onboardingResponseRepository;
         this.goalRepository = goalRepository;
         this.ariSnapshotRepository = ariSnapshotRepository;
         this.aiOnboardingClient = aiOnboardingClient;
+        this.aiMissionRecommendClient = aiMissionRecommendClient;
     }
 
     @Transactional
@@ -78,7 +87,7 @@ public class AuthService {
             request.autonomyGoal(),
             request.connectionGoal(),
             aiResult.period(),
-            aiResult.firstStepMission()
+            recommendFirstStepMission(user.getId(), request, aiResult)
         ));
 
         AriVector initialAri = aiResult.initialAri();
@@ -143,6 +152,42 @@ public class AuthService {
         if (request.connectionGoal() == null || request.connectionGoal().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "connectionGoal is required.");
         }
+    }
+
+    private String recommendFirstStepMission(String userId, SignupRequest request, AiOnboardingResult aiResult) {
+        TodayMissionResponse response = aiMissionRecommendClient.recommend(
+            new AiMissionRecommendRequest(
+                userId,
+                aiResult.initialAri(),
+                aiResult.goal(),
+                List.of(),
+                energy(request),
+                new RhythmHistory(List.of(), List.of()),
+                List.of()
+            ),
+            null
+        );
+
+        if (response != null && "AI".equals(response.source())) {
+            Mission mission = response.mission();
+            if (mission == null) {
+                mission = response.fallback();
+            }
+            if (mission != null && mission.title() != null && !mission.title().isBlank()) {
+                return mission.title();
+            }
+            if (response.restMessage() != null && !response.restMessage().isBlank()) {
+                return response.restMessage();
+            }
+        }
+        return aiResult.firstStepMission();
+    }
+
+    private Short energy(SignupRequest request) {
+        if (request.rhythmChoice() == null) {
+            return 3;
+        }
+        return request.rhythmChoice().shortValue();
     }
 
     private void validateLoginRequest(LoginRequest request) {
