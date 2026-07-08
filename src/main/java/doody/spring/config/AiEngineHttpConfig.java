@@ -11,7 +11,7 @@ import org.springframework.web.client.RestClient;
 public class AiEngineHttpConfig {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
-    private static final Duration READ_TIMEOUT = Duration.ofSeconds(70);
+    private static final Duration READ_TIMEOUT = Duration.ofMinutes(3);
 
     @Bean
     @Qualifier("aiEngineRestClient")
