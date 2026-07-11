@@ -1,6 +1,7 @@
 package doody.spring.report.client;
 
 import doody.spring.report.dto.RecoveryReportResponse.ActivitySummary;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +104,7 @@ public class AiReportSummaryClient {
         Integer activeDays,
         Integer points,
         Map<String, Integer> axisCounts,
+        Map<String, BigDecimal> goal,
         List<RecentMission> recentMissions
     ) {
     }

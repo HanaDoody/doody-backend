@@ -2,12 +2,14 @@ package doody.spring.report.service;
 
 import doody.spring.domain.entity.CollectionCapture;
 import doody.spring.domain.entity.EnergyLog;
+import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.MissionLog;
 import doody.spring.domain.entity.ReportSummary;
 import doody.spring.domain.entity.RhythmLog;
 import doody.spring.domain.entity.User;
 import doody.spring.domain.repository.CollectionCaptureRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
+import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.MissionLogRepository;
 import doody.spring.domain.repository.PointTransactionRepository;
 import doody.spring.domain.repository.ReportSummaryRepository;
@@ -24,6 +26,7 @@ import doody.spring.report.dto.RecoveryReportResponse.AxisSummary;
 import doody.spring.report.dto.RecoveryReportResponse.RecordItem;
 import doody.spring.report.dto.RecoveryReportResponse.Summary;
 import doody.spring.report.dto.ReportSummaryResponse;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -33,6 +36,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -52,6 +56,7 @@ public class ReportService {
     private final ReportSummaryRepository reportSummaryRepository;
     private final RhythmLogRepository rhythmLogRepository;
     private final EnergyLogRepository energyLogRepository;
+    private final GoalRepository goalRepository;
     private final MissionLogRepository missionLogRepository;
     private final CollectionCaptureRepository collectionCaptureRepository;
     private final PointTransactionRepository pointTransactionRepository;
@@ -62,6 +67,7 @@ public class ReportService {
         ReportSummaryRepository reportSummaryRepository,
         RhythmLogRepository rhythmLogRepository,
         EnergyLogRepository energyLogRepository,
+        GoalRepository goalRepository,
         MissionLogRepository missionLogRepository,
         CollectionCaptureRepository collectionCaptureRepository,
         PointTransactionRepository pointTransactionRepository,
@@ -71,6 +77,7 @@ public class ReportService {
         this.reportSummaryRepository = reportSummaryRepository;
         this.rhythmLogRepository = rhythmLogRepository;
         this.energyLogRepository = energyLogRepository;
+        this.goalRepository = goalRepository;
         this.missionLogRepository = missionLogRepository;
         this.collectionCaptureRepository = collectionCaptureRepository;
         this.pointTransactionRepository = pointTransactionRepository;
@@ -173,7 +180,7 @@ public class ReportService {
             .toList();
 
         ActivitySummary activitySummary = "month".equals(reportPeriod.value())
-            ? generateMonthlyActivitySummary(user, reportPeriod, buildStats(summary, axisSummaries, missionLogs))
+            ? generateMonthlyActivitySummary(user, reportPeriod, buildStats(userId, summary, axisSummaries, missionLogs))
             : null;
 
         return new RecoveryReportResponse(
@@ -247,7 +254,19 @@ public class ReportService {
             + ",\"autonomy\":" + stats.axisCounts().getOrDefault("autonomy", 0)
             + ",\"connection\":" + stats.axisCounts().getOrDefault("connection", 0)
             + "}"
+            + ",\"goal\":" + toGoalJson(stats.goal())
             + ",\"recent_missions\":" + toRecentMissionsJson(stats.recentMissions())
+            + "}";
+    }
+
+    private String toGoalJson(Map<String, BigDecimal> goal) {
+        if (goal == null || goal.isEmpty()) {
+            return "{}";
+        }
+        return "{"
+            + "\"rhythm\":" + goal.get("rhythm")
+            + ",\"autonomy\":" + goal.get("autonomy")
+            + ",\"connection\":" + goal.get("connection")
             + "}";
     }
 
@@ -286,6 +305,7 @@ public class ReportService {
     }
 
     private ReportSummaryStats buildStats(
+        String userId,
         Summary summary,
         List<AxisSummary> axisSummaries,
         List<MissionLog> missionLogs
@@ -305,13 +325,27 @@ public class ReportService {
             ))
             .toList();
 
+        Map<String, BigDecimal> goal = goalRepository
+            .findTopByUser_IdAndActiveTrueOrderByCreatedAtDesc(userId)
+            .map(this::toGoalMap)
+            .orElseGet(Map::of);
+
         return new ReportSummaryStats(
             summary.totalRecordCount(),
             summary.recordedDayCount(),
             summary.totalPoint(),
             axisCounts,
+            goal,
             recentMissions
         );
+    }
+
+    private Map<String, BigDecimal> toGoalMap(Goal goal) {
+        Map<String, BigDecimal> values = new LinkedHashMap<>();
+        values.put("rhythm", goal.getRhythm());
+        values.put("autonomy", goal.getAutonomy());
+        values.put("connection", goal.getConnection());
+        return values;
     }
 
     private int countByAxis(List<RecordWithAxis> records, String axis) {
