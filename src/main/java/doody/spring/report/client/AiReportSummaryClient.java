@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import doody.spring.report.dto.RecoveryReportResponse.ActivitySummary;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -108,6 +109,10 @@ public class AiReportSummaryClient {
         Integer points,
         @JsonProperty("axis_counts")
         Map<String, Integer> axisCounts,
+        @JsonProperty("ari_start")
+        Map<String, BigDecimal> ariStart,
+        @JsonProperty("ari_now")
+        Map<String, BigDecimal> ariNow,
         Map<String, BigDecimal> goal,
         @JsonProperty("recent_missions")
         List<RecentMission> recentMissions
@@ -119,6 +124,7 @@ public class AiReportSummaryClient {
         String missionId,
         String axis,
         String title,
+        LocalDate date,
         @JsonProperty("completed_at")
         LocalDateTime completedAt
     ) {
