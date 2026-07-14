@@ -9,6 +9,7 @@ import doody.spring.report.client.AiReportSummaryClient.RecentMission;
 import doody.spring.report.client.AiReportSummaryClient.ReportSummaryStats;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -26,11 +27,14 @@ class AiReportSummaryClientJsonTest {
             8,
             160,
             Map.of("rhythm", 6, "autonomy", 4, "connection", 2),
+            Map.of("rhythm", new BigDecimal("0.2"), "autonomy", new BigDecimal("0.1"), "connection", new BigDecimal("0.4")),
+            Map.of("rhythm", new BigDecimal("0.5"), "autonomy", new BigDecimal("0.3"), "connection", new BigDecimal("0.42")),
             Map.of("rhythm", new BigDecimal("0.5")),
             List.of(new RecentMission(
                 "mission-1",
                 "AUTONOMY",
                 "예시 미션",
+                LocalDate.of(2026, 6, 10),
                 LocalDateTime.of(2026, 6, 10, 12, 30)
             ))
         );
@@ -40,9 +44,12 @@ class AiReportSummaryClientJsonTest {
         assertThat(json.has("total_records")).isTrue();
         assertThat(json.has("active_days")).isTrue();
         assertThat(json.has("axis_counts")).isTrue();
+        assertThat(json.has("ari_start")).isTrue();
+        assertThat(json.has("ari_now")).isTrue();
         assertThat(json.has("recent_missions")).isTrue();
         assertThat(json.has("totalRecords")).isFalse();
         assertThat(json.at("/recent_missions/0/mission_id").asText()).isEqualTo("mission-1");
+        assertThat(json.at("/recent_missions/0/date").asText()).isEqualTo("2026-06-10");
         assertThat(json.at("/recent_missions/0/completed_at").asText()).isEqualTo("2026-06-10T12:30:00");
     }
 }

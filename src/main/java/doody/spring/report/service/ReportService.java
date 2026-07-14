@@ -1,6 +1,7 @@
 package doody.spring.report.service;
 
 import doody.spring.domain.entity.CollectionCapture;
+import doody.spring.domain.entity.AriSnapshot;
 import doody.spring.domain.entity.EnergyLog;
 import doody.spring.domain.entity.Goal;
 import doody.spring.domain.entity.MissionLog;
@@ -8,6 +9,7 @@ import doody.spring.domain.entity.ReportSummary;
 import doody.spring.domain.entity.RhythmLog;
 import doody.spring.domain.entity.User;
 import doody.spring.domain.repository.CollectionCaptureRepository;
+import doody.spring.domain.repository.AriSnapshotRepository;
 import doody.spring.domain.repository.EnergyLogRepository;
 import doody.spring.domain.repository.GoalRepository;
 import doody.spring.domain.repository.MissionLogRepository;
@@ -59,6 +61,7 @@ public class ReportService {
     private final GoalRepository goalRepository;
     private final MissionLogRepository missionLogRepository;
     private final CollectionCaptureRepository collectionCaptureRepository;
+    private final AriSnapshotRepository ariSnapshotRepository;
     private final PointTransactionRepository pointTransactionRepository;
     private final AiReportSummaryClient aiReportSummaryClient;
 
@@ -70,6 +73,7 @@ public class ReportService {
         GoalRepository goalRepository,
         MissionLogRepository missionLogRepository,
         CollectionCaptureRepository collectionCaptureRepository,
+        AriSnapshotRepository ariSnapshotRepository,
         PointTransactionRepository pointTransactionRepository,
         AiReportSummaryClient aiReportSummaryClient
     ) {
@@ -80,6 +84,7 @@ public class ReportService {
         this.goalRepository = goalRepository;
         this.missionLogRepository = missionLogRepository;
         this.collectionCaptureRepository = collectionCaptureRepository;
+        this.ariSnapshotRepository = ariSnapshotRepository;
         this.pointTransactionRepository = pointTransactionRepository;
         this.aiReportSummaryClient = aiReportSummaryClient;
     }
@@ -180,7 +185,11 @@ public class ReportService {
             .toList();
 
         ActivitySummary activitySummary = "month".equals(reportPeriod.value())
-            ? generateMonthlyActivitySummary(user, reportPeriod, buildStats(userId, summary, axisSummaries, missionLogs))
+            ? generateMonthlyActivitySummary(
+                user,
+                reportPeriod,
+                buildStats(userId, startAt, endAt, summary, axisSummaries, missionLogs)
+            )
             : null;
 
         return new RecoveryReportResponse(
@@ -254,6 +263,8 @@ public class ReportService {
             + ",\"autonomy\":" + stats.axisCounts().getOrDefault("autonomy", 0)
             + ",\"connection\":" + stats.axisCounts().getOrDefault("connection", 0)
             + "}"
+            + ",\"ari_start\":" + toAriJson(stats.ariStart())
+            + ",\"ari_now\":" + toAriJson(stats.ariNow())
             + ",\"goal\":" + toGoalJson(stats.goal())
             + ",\"recent_missions\":" + toRecentMissionsJson(stats.recentMissions())
             + "}";
@@ -267,6 +278,17 @@ public class ReportService {
             + "\"rhythm\":" + goal.get("rhythm")
             + ",\"autonomy\":" + goal.get("autonomy")
             + ",\"connection\":" + goal.get("connection")
+            + "}";
+    }
+
+    private String toAriJson(Map<String, BigDecimal> ari) {
+        if (ari == null || ari.isEmpty()) {
+            return "{}";
+        }
+        return "{"
+            + "\"rhythm\":" + ari.get("rhythm")
+            + ",\"autonomy\":" + ari.get("autonomy")
+            + ",\"connection\":" + ari.get("connection")
             + "}";
     }
 
@@ -306,6 +328,8 @@ public class ReportService {
 
     private ReportSummaryStats buildStats(
         String userId,
+        LocalDateTime startAt,
+        LocalDateTime endAt,
         Summary summary,
         List<AxisSummary> axisSummaries,
         List<MissionLog> missionLogs
@@ -321,6 +345,7 @@ public class ReportService {
                 missionLog.getMissionTemplate().getId(),
                 missionLog.getMissionTemplate().getAxis(),
                 missionLog.getMissionTemplate().getTitle(),
+                missionLog.getCompletedAt().toLocalDate(),
                 missionLog.getCompletedAt()
             ))
             .toList();
@@ -330,14 +355,35 @@ public class ReportService {
             .map(this::toGoalMap)
             .orElseGet(Map::of);
 
+        Map<String, BigDecimal> ariStart = findAriAt(userId, startAt);
+        Map<String, BigDecimal> ariNow = findAriAt(userId, endAt);
+
         return new ReportSummaryStats(
             summary.totalRecordCount(),
             summary.recordedDayCount(),
             summary.totalPoint(),
             axisCounts,
+            ariStart,
+            ariNow,
             goal,
             recentMissions
         );
+    }
+
+    private Map<String, BigDecimal> findAriAt(String userId, LocalDateTime timestamp) {
+        return ariSnapshotRepository
+            .findTopByUser_IdAndTimestampLessThanEqualOrderByTimestampDesc(userId, timestamp)
+            .or(() -> ariSnapshotRepository.findTopByUser_IdOrderByTimestampAsc(userId))
+            .map(this::toAriMap)
+            .orElseGet(Map::of);
+    }
+
+    private Map<String, BigDecimal> toAriMap(AriSnapshot snapshot) {
+        Map<String, BigDecimal> values = new LinkedHashMap<>();
+        values.put("rhythm", snapshot.getRhythm());
+        values.put("autonomy", snapshot.getAutonomy());
+        values.put("connection", snapshot.getConnection());
+        return values;
     }
 
     private Map<String, BigDecimal> toGoalMap(Goal goal) {
