@@ -1,5 +1,6 @@
 package doody.spring.report.client;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import doody.spring.report.dto.RecoveryReportResponse.ActivitySummary;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -100,24 +101,31 @@ public class AiReportSummaryClient {
     }
 
     public record ReportSummaryStats(
+        @JsonProperty("total_records")
         Integer totalRecords,
+        @JsonProperty("active_days")
         Integer activeDays,
         Integer points,
+        @JsonProperty("axis_counts")
         Map<String, Integer> axisCounts,
         Map<String, BigDecimal> goal,
+        @JsonProperty("recent_missions")
         List<RecentMission> recentMissions
     ) {
     }
 
     public record RecentMission(
+        @JsonProperty("mission_id")
         String missionId,
         String axis,
         String title,
+        @JsonProperty("completed_at")
         LocalDateTime completedAt
     ) {
     }
 
     private record AiReportSummaryRequest(
+        @JsonProperty("user_id")
         String userId,
         String period,
         ReportSummaryStats stats
@@ -127,6 +135,7 @@ public class AiReportSummaryClient {
     private record AiReportSummaryResponse(
         String summary,
         List<String> highlights,
+        @JsonProperty("generated_at")
         String generatedAt
     ) {
     }
