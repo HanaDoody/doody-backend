@@ -2,16 +2,20 @@ package doody.spring.rhythm.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import doody.spring.rhythm.dto.EveningRhythmResponse.CollectedDudy;
-import doody.spring.rhythm.dto.EveningRhythmResponse.Reward;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
 public class AiEveningRhythmClient {
+
+    private static final Logger log = LoggerFactory.getLogger(AiEveningRhythmClient.class);
 
     private final String baseUrl;
     private final RestClient restClient;
@@ -32,7 +36,7 @@ public class AiEveningRhythmClient {
         try {
             AiEveningResponse response = restClient.post()
                 .uri(baseUrl + "/rhythm/evening")
-                .body(new AiEveningRequest(userId, timestamp, text))
+                .body(new AiEveningRequest(userId, text))
                 .retrieve()
                 .body(AiEveningResponse.class);
 
@@ -42,7 +46,7 @@ public class AiEveningRhythmClient {
 
             Integer hanaMoney = response.reward() == null ? 0 : response.reward().hanaMoney();
             String reply = response.reply() == null || response.reply().isBlank()
-                ? "오늘도 잘 마무리했어. 이 기록이 내일의 기준이 될 거야."
+                ? "오늘 하루도 수고 많았어. 이야기해줘서 고마워."
                 : response.reply();
             List<CollectedDudy> collectedDudy = response.collectedDudy() == null
                 ? List.of()
@@ -55,16 +59,18 @@ public class AiEveningRhythmClient {
                     ))
                     .toList();
 
-            return new AiEveningResult(hanaMoney, reply, null, collectedDudy);
+            String signals = response.signals() == null ? null : response.signals().toString();
+            return new AiEveningResult(hanaMoney, reply, signals, collectedDudy);
         } catch (Exception exception) {
+            log.warn("AI evening rhythm request failed; using fallback reply: {}", exception.getMessage());
             return fallback();
         }
     }
 
     private AiEveningResult fallback() {
         return new AiEveningResult(
-            30,
-            "오늘도 잘 마무리했어. 이 기록이 내일의 기준이 될 거야.",
+            20,
+            "오늘 하루도 수고 많았어. 이야기해줘서 고마워.",
             null,
             List.of()
         );
@@ -81,17 +87,22 @@ public class AiEveningRhythmClient {
     private record AiEveningRequest(
         @JsonProperty("user_id")
         String userId,
-        LocalDateTime timestamp,
         String text
     ) {
     }
 
     private record AiEveningResponse(
-        Reward reward,
+        AiReward reward,
         String reply,
-        String signals,
+        Map<String, Double> signals,
         @JsonProperty("collected_dudy")
         List<AiCollectedDudy> collectedDudy
+    ) {
+    }
+
+    private record AiReward(
+        @JsonProperty("hana_money")
+        Integer hanaMoney
     ) {
     }
 
