@@ -1,0 +1,82 @@
+{
+  "recordedAt": "2026-10-17T16:17:25.490Z",
+  "dateZone": "Asia/Seoul",
+  "javaVersion": "21.0.10",
+  "nodeVersion": "v20.19.5",
+  "buildCommand": ".\\gradlew.bat clean build --no-daemon --console=plain",
+  "buildExitCode": 0,
+  "javaTests": 35,
+  "javaFailures": 0,
+  "javaSkipped": 0,
+  "suites": [
+    {
+      "suite": "doody.spring.agentgenerated.RewardPersistenceAgentTest",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failedTests": []
+    },
+    {
+      "suite": "doody.spring.ApplicationTests",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failedTests": []
+    },
+    {
+      "suite": "doody.spring.collection.controller.CollectionCaptureApiContractTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failedTests": []
+    },
+    {
+      "suite": "doody.spring.common.util.RhythmTextNormalizerTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failedTests": []
+    },
+    {
+      "suite": "doody.spring.report.client.AiReportSummaryClientJsonTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failedTests": []
+    },
+    {
+      "suite": "doody.spring.rhythm.client.AiEveningRhythmClientTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failedTests": []
+    }
+  ],
+  "generatedTestCount": 20,
+  "agentActions": 15,
+  "generatedVersions": 2,
+  "targetedTestExecutions": 2,
+  "provider": "session",
+  "model": "current-chat-model",
+  "liveApiValidated": false,
+  "productionHash": "957f14f54114d8fe80631f79afa4941bc4488ee3338ff45361c7783e9d88a8c4",
+  "testHash": "2447d6bb856dc7433c2a89526d75daeaf0affe6c1cfe2d629eb877e64105f5b3",
+  "documentationRun": {
+    "document": {
+      "path": "docs/api/collection-capture.md",
+      "sha256": "d2f61aba56f224a6ff462024c53da98a4e79bc49bb09cef8715e336d4b3c503d",
+      "generatedAfterTestRun": "2026-10-17T16:12:22.839Z"
+    },
+    "targetedTests": 24,
+    "failures": 0,
+    "elapsedTestExecutionSeconds": 15.423,
+    "httpContractTests": 4,
+    "source": ".agent-runs/reward-docs/state.json"
+  }
+}

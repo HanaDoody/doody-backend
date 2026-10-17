@@ -1,0 +1,41 @@
+{
+  "commit": "232f9028c73f98bf78449216e88d68973e0ddd6e",
+  "phase": "isolated-test-profile",
+  "command": ".\\gradlew.bat clean build --no-daemon --console=plain",
+  "java": "21.0.10",
+  "exitCode": 0,
+  "testCount": 11,
+  "testFailures": 0,
+  "testErrors": 0,
+  "testSkipped": 0,
+  "suites": [
+    {
+      "suite": "doody.spring.ApplicationTests",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "doody.spring.common.util.RhythmTextNormalizerTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "doody.spring.report.client.AiReportSummaryClientJsonTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "doody.spring.rhythm.client.AiEveningRhythmClientTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ]
+}

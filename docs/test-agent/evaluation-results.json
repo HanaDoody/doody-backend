@@ -1,0 +1,109 @@
+{
+  "recordedAt": "2026-10-17T16:17:25.493Z",
+  "productionHash": "957f14f54114d8fe80631f79afa4941bc4488ee3338ff45361c7783e9d88a8c4",
+  "testHash": "2447d6bb856dc7433c2a89526d75daeaf0affe6c1cfe2d629eb877e64105f5b3",
+  "controlPassed": true,
+  "selectedDefects": 5,
+  "detectedSelectedDefects": 5,
+  "cases": [
+    {
+      "id": "control",
+      "description": "Unmodified production code",
+      "detected": null,
+      "classification": "passed",
+      "tests": 20,
+      "failures": 0,
+      "startedAt": "2026-10-17T15:56:02.695Z",
+      "endedAt": "2026-10-17T15:56:16.627Z",
+      "failedTests": []
+    },
+    {
+      "id": "accept-nonpositive-points",
+      "description": "Remove zero/negative rejection",
+      "detected": true,
+      "classification": "test_failure",
+      "tests": 20,
+      "failures": 3,
+      "startedAt": "2026-10-17T15:56:16.832Z",
+      "endedAt": "2026-10-17T15:56:30.946Z",
+      "failedTests": [
+        {
+          "test": "[2] amount = 0",
+          "details": "org.mockito.exceptions.verification.NoInteractionsWanted: \nNo interactions wanted here:\n-> at doody.spring.agentgenerated.RewardPersistenceAgentTest.R01_rejectsNullZeroAndNegativeAmounts(RewardPersistenceAgentTest.java:43)\nBut found these interactions on mock 'points':\n-> at doody.spring.common.service.RewardPersistenceService.earnPoint(RewardPersistenceService.java:39)\nActually, above is the only interaction with this mock.\r\n\tat doody.spring.agentgenerated.RewardPersistenceAgentTest.R01_rejectsNullZeroAndNegativeAmounts(RewardPersistenceAgentTest.java:43)\r\n"
+        },
+        {
+          "test": "[3] amount = -1",
+          "details": "org.mockito.exceptions.verification.NoInteractionsWanted: \nNo interactions wanted here:\n-> at doody.spring.agentgenerated.RewardPersistenceAgentTest.R01_rejectsNullZeroAndNegativeAmounts(RewardPersistenceAgentTest.java:43)\nBut found these interactions on mock 'points':\n-> at doody.spring.common.service.RewardPersistenceService.earnPoint(RewardPersistenceService.java:39)\nActually, above is the only interaction with this mock.\r\n\tat doody.spring.agentgenerated.RewardPersistenceAgentTest.R01_rejectsNullZeroAndNegativeAmounts(RewardPersistenceAgentTest.java:43)\r\n"
+        },
+        {
+          "test": "[4] amount = -100",
+          "details": "org.mockito.exceptions.verification.NoInteractionsWanted: \nNo interactions wanted here:\n-> at doody.spring.agentgenerated.RewardPersistenceAgentTest.R01_rejectsNullZeroAndNegativeAmounts(RewardPersistenceAgentTest.java:43)\nBut found these interactions on mock 'points':\n-> at doody.spring.common.service.RewardPersistenceService.earnPoint(RewardPersistenceService.java:39)\nActually, above is the only interaction with this mock.\r\n\tat doody.spring.agentgenerated.RewardPersistenceAgentTest.R01_rejectsNullZeroAndNegativeAmounts(RewardPersistenceAgentTest.java:43)\r\n"
+        }
+      ]
+    },
+    {
+      "id": "duplicate-collection",
+      "description": "Check existence but ignore duplicate result",
+      "detected": true,
+      "classification": "test_failure",
+      "tests": 20,
+      "failures": 1,
+      "startedAt": "2026-10-17T15:56:31.152Z",
+      "endedAt": "2026-10-17T15:56:44.995Z",
+      "failedTests": [
+        {
+          "test": "R05_existingCollectionDoesNotSaveAgain()",
+          "details": "java.lang.AssertionError: \r\nExpecting an empty Optional but was containing value: doody.spring.domain.entity.DoodyCollection@1e1232cf\r\n\tat doody.spring.agentgenerated.RewardPersistenceAgentTest.R05_existingCollectionDoesNotSaveAgain(RewardPersistenceAgentTest.java:90)\r\n"
+        }
+      ]
+    },
+    {
+      "id": "wrong-default-tier",
+      "description": "Replace template tier with an incorrect constant",
+      "detected": true,
+      "classification": "test_failure",
+      "tests": 20,
+      "failures": 1,
+      "startedAt": "2026-10-17T15:56:45.192Z",
+      "endedAt": "2026-10-17T15:56:59.548Z",
+      "failedTests": [
+        {
+          "test": "R06_nullMetadataUsesTemplateAndSourceDefaults()",
+          "details": "org.opentest4j.AssertionFailedError: \r\nexpected: \"common\"\r\n but was: \"WRONG\"\r\n\tat doody.spring.agentgenerated.RewardPersistenceAgentTest.R06_nullMetadataUsesTemplateAndSourceDefaults(RewardPersistenceAgentTest.java:107)\r\n"
+        }
+      ]
+    },
+    {
+      "id": "lost-point-origin",
+      "description": "Drop point source ID",
+      "detected": true,
+      "classification": "test_failure",
+      "tests": 20,
+      "failures": 1,
+      "startedAt": "2026-10-17T15:56:59.756Z",
+      "endedAt": "2026-10-17T15:57:14.142Z",
+      "failedTests": [
+        {
+          "test": "R02_persistsPositiveAmountAndItsProvenance()",
+          "details": "java.lang.AssertionError: \r\nExpecting actual not to be null\r\n\tat doody.spring.agentgenerated.RewardPersistenceAgentTest.R02_persistsPositiveAmountAndItsProvenance(RewardPersistenceAgentTest.java:57)\r\n"
+        }
+      ]
+    },
+    {
+      "id": "wrong-contact-axis",
+      "description": "Overwrite provided contact axis",
+      "detected": true,
+      "classification": "test_failure",
+      "tests": 20,
+      "failures": 1,
+      "startedAt": "2026-10-17T15:57:14.337Z",
+      "endedAt": "2026-10-17T15:57:28.445Z",
+      "failedTests": [
+        {
+          "test": "R08_newContactPersistsAllProvenanceFields()",
+          "details": "org.opentest4j.AssertionFailedError: \r\nexpected: \"connection\"\r\n but was: \"WRONG\"\r\n\tat doody.spring.agentgenerated.RewardPersistenceAgentTest.R08_newContactPersistsAllProvenanceFields(RewardPersistenceAgentTest.java:168)\r\n"
+        }
+      ]
+    }
+  ]
+}
