@@ -1,27 +1,217 @@
-# EC2 + GitHub Actions 백엔드 자동 배포 가이드
+# AWS + GitHub Actions 백엔드 배포 가이드
 
-작성일: 2026-07-04  
-대상: Spring Boot 백엔드 jar 배포
+최초 작성: 2026-07-04  
+전면 개정: 2026-11-23 (AWS 재구축, 시드니 리전, Nginx, CloudFront 추가)  
+대상: Spring Boot 백엔드 jar 배포 (포트폴리오용, 정식 출시 계획 없음)
 
-## 1. 배포 구조
+## 1. 전체 구성
+
+| 항목 | 값 |
+|---|---|
+| 리전 | `ap-southeast-2` (아시아 태평양 · 시드니) |
+| API 주소 | `http://3.24.77.23/api` (Nginx 80 → Spring 8080) |
+| Swagger | `http://3.24.77.23/swagger-ui/index.html` |
+| 이미지 주소 | `https://d20ic6nyseo37c.cloudfront.net/doody/mission/...` |
+| EC2 | `doody-backend`, Ubuntu 24.04, t3.small, 탄력적 IP `3.24.77.23` |
+| RDS | `doody-db`, PostgreSQL, db.t4g.micro, 초기 DB `doody`, 퍼블릭 액세스 없음 |
+| S3 | `doody-evidence` (퍼블릭 액세스 차단 유지) |
+| CloudFront | 배포 `E1KE0EYTPC1U0Y`, OAC로 S3 접근 |
+| Redis | EC2 내부 설치 (`127.0.0.1:6379`, 외부 미노출) |
+
+서울 리전은 무료 플랜에서 제한되어 시드니를 사용한다. 서울로 옮기려면 계정 플랜을 업그레이드한 뒤 이 문서 순서대로 다시 구성하고 RDS 데이터와 S3 객체를 옮긴다.
+
+```mermaid
+flowchart LR
+    Client[앱 / 브라우저] -- "HTTP :80" --> Nginx
+    subgraph EC2[EC2 doody-backend]
+        Nginx -- "127.0.0.1:8080" --> Spring[Spring Boot]
+        Spring --> Redis[(Redis)]
+    end
+    Spring -- "5432 (VPC 내부)" --> RDS[(RDS PostgreSQL)]
+    Spring -- "PutObject (IAM Role)" --> S3[(S3 doody-evidence)]
+    Client -- "HTTPS 이미지 조회" --> CF[CloudFront]
+    CF -- "OAC" --> S3
+```
 
 ```mermaid
 sequenceDiagram
     participant Dev as Developer
-    participant GH as GitHub
     participant GA as GitHub Actions
     participant EC2 as EC2
-    participant S3 as S3
 
-    Dev->>GH: git push main
-    GH->>GA: workflow 실행
-    GA->>GA: Java 21 설정 및 bootJar 빌드
-    GA->>EC2: app.jar 업로드
+    Dev->>GA: main push 또는 Run workflow
+    GA->>GA: Java 21 bootJar 빌드
+    GA->>EC2: scp로 jar 업로드
+    GA->>EC2: .env와 systemd 서비스 작성
     GA->>EC2: systemctl restart doody-backend
-    EC2->>S3: IAM Role로 증빙 이미지 업로드
 ```
 
-## 2. GitHub Actions Workflow
+## 2. 보안그룹
+
+| 이름 | 인바운드 | 비고 |
+|---|---|---|
+| `doody-ec2-sg` | SSH 22, HTTP 80, HTTPS 443 (모두 `0.0.0.0/0`) | GitHub Actions IP가 고정이 아니어서 22를 전체 허용. 접속은 키 인증만 가능 |
+| `doody-rds-sg` | PostgreSQL 5432, 소스 = `doody-ec2-sg` | 절대 `0.0.0.0/0`으로 열지 않는다 |
+
+8080은 열지 않는다. 모든 요청은 Nginx(80)를 거친다.
+
+## 3. S3 + CloudFront
+
+### 3-1. S3 버킷
+
+- 이름 `doody-evidence`, 리전 시드니, 글로벌 네임스페이스
+- ACL 비활성화, **모든 퍼블릭 액세스 차단 유지**, SSE-S3 암호화
+
+### 3-2. CloudFront
+
+- 원본: `doody-evidence.s3.ap-southeast-2.amazonaws.com` (`s3-website` 주소 아님)
+- 원본 액세스: OAC (CloudFront에 대한 프라이빗 S3 버킷 액세스 허용)
+- 뷰어 프로토콜: Redirect HTTP to HTTPS, 캐시: S3 기본 권장 설정, WAF 없음
+
+버킷 정책에는 CloudFront 배포만 읽을 수 있게 하는 정책이 자동으로 들어간다.
+
+```json
+{
+  "Effect": "Allow",
+  "Principal": { "Service": "cloudfront.amazonaws.com" },
+  "Action": "s3:GetObject",
+  "Resource": "arn:aws:s3:::doody-evidence/*",
+  "Condition": {
+    "ArnLike": { "AWS:SourceArn": "arn:aws:cloudfront::<ACCOUNT_ID>:distribution/E1KE0EYTPC1U0Y" }
+  }
+}
+```
+
+### 3-3. 이미지 URL 동작
+
+`S3FileStorageService.publicUrl()`은 `S3_PUBLIC_BASE_URL`이 있으면 그 주소를 기준으로 URL을 만든다. 비어 있으면 S3 직접 주소를 반환하는데, 버킷이 비공개라서 `AccessDenied`가 난다. 따라서 **`S3_PUBLIC_BASE_URL`은 반드시 CloudFront 주소로 설정한다.**
+
+```env
+S3_PUBLIC_BASE_URL=https://d20ic6nyseo37c.cloudfront.net
+```
+
+끝에 `/`를 붙이지 않는다.
+
+## 4. EC2 IAM Role
+
+- 역할 이름: `doody-app-ec2-role` (신뢰 엔터티: EC2)
+- 인라인 정책 `DoodyMissionEvidenceS3Policy`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DoodyMissionEvidenceUpload",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::doody-evidence/doody/mission/*"
+    }
+  ]
+}
+```
+
+코드는 `DefaultCredentialsProvider`로 이 역할을 자동 인식한다. EC2와 GitHub Secrets 어디에도 AWS Access Key를 넣지 않는다.
+
+## 5. RDS
+
+- 생성 방식: **전체 구성** (빠른 구성/손쉬운 생성 사용 안 함)
+- 엔진: **PostgreSQL** (Aurora 아님), 템플릿: 프리 티어, 단일 AZ
+- 자격 증명 관리: **자체 관리** (Secrets Manager 사용 안 함)
+- 스토리지: gp3 20GiB, 자동 조정 끔
+- 연결: EC2 컴퓨팅 리소스에 연결 안 함, 퍼블릭 액세스 아니요, 인터넷 액세스 게이트웨이 비활성화, 보안그룹 `doody-rds-sg`
+- 추가 구성: **초기 데이터베이스 이름 `doody`** (비워 두면 DB가 생성되지 않음), 삭제 방지 켬
+
+`application-prod.yml`이 `sslmode=require`를 사용하며 RDS는 이를 지원한다. 테이블은 `ddl-auto: update`로 첫 기동 시 생성된다.
+
+## 6. EC2 최초 1회 준비
+
+### 6-1. 인스턴스
+
+- Ubuntu Server 24.04 LTS (x86), t3.small, gp3 20GiB
+- 키 페어 `doody-key` (RSA, .pem), 보안그룹 `doody-ec2-sg`
+- 고급 세부 정보의 IAM 인스턴스 프로파일: `doody-app-ec2-role`
+- 탄력적 IP를 할당해 연결한다 (연결하지 않은 탄력적 IP는 과금된다)
+
+### 6-2. 패키지 설치
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y openjdk-21-jre-headless redis-server nginx
+```
+
+swap 2GB:
+
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+확인:
+
+```bash
+java -version
+redis-cli ping            # PONG
+free -h                   # Swap 2.0Gi
+nc -zv <RDS_ENDPOINT> 5432  # succeeded!
+```
+
+`doody` 사용자, `/opt/doody/.env`, systemd 서비스는 GitHub Actions workflow가 배포할 때마다 자동으로 작성하므로 직접 만들 필요가 없다.
+
+### 6-3. Nginx
+
+```bash
+sudo tee /etc/nginx/sites-available/doody > /dev/null << 'EOF'
+server {
+    listen 80 default_server;
+    server_name _;
+    client_max_body_size 20M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+}
+EOF
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo ln -sf /etc/nginx/sites-available/doody /etc/nginx/sites-enabled/doody
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+- `client_max_body_size 20M`: 증빙 이미지 업로드 허용 크기
+- `proxy_read_timeout 120s`: AI 엔진 응답 지연 대비
+
+## 7. GitHub Secrets
+
+위치: `Settings -> Secrets and variables -> Actions`
+
+| Secret | 값 | 비고 |
+|---|---|---|
+| `EC2_HOST` | `3.24.77.23` | 탄력적 IP |
+| `EC2_USERNAME` | `ubuntu` | 오타 주의 (`ubunto`로 넣어 배포가 실패한 적 있음) |
+| `EC2_SSH_KEY` | `doody-key.pem` 전체 내용 | 아래 등록 방법 참고 |
+| `DB_HOST` | RDS 엔드포인트 | |
+| `DB_NAME` | `doody` | |
+| `DB_USERNAME` / `DB_PASSWORD` | RDS 마스터 계정 | |
+| `AWS_REGION` | `ap-southeast-2` | |
+| `S3_BUCKET` | `doody-evidence` | |
+| `S3_PUBLIC_BASE_URL` | `https://d20ic6nyseo37c.cloudfront.net` | 끝에 `/` 없음 |
+| `HANA_AUTONOMY_URL` | `https://www.hanafn.com` | **반드시 등록** |
+| `HANA_CONNECTION_URL` | `https://www.hanafn.com` | **반드시 등록** |
+| `AI_ENGINE_BASE_URL` | AI 엔진 주소 | |
+
+workflow는 등록되지 않은 시크릿을 **빈 값**으로 `.env`에 쓴다. yml의 `${VAR:기본값}`은 변수가 아예 없을 때만 적용되고 빈 값이면 적용되지 않으므로, 기본값이 있는 항목도 시크릿으로 등록한다.
+
+`EC2_SSH_KEY`는 복사·붙여넣기 대신 파일을 그대로 등록한다. 메모장을 거치면 줄바꿈이 깨져 `error in libcrypto`가 날 수 있다.
+
+```powershell
+Get-Content -Raw "$HOME\.ssh\doody-key.pem" | gh secret set EC2_SSH_KEY --repo HanaDoody/doody-backend
+```
+
+## 8. GitHub Actions 자동 배포
 
 파일 위치:
 
@@ -33,12 +223,24 @@ sequenceDiagram
 
 | 조건 | 설명 |
 |---|---|
-| `main` 브랜치 push | 자동 배포 실행 |
-| `workflow_dispatch` | GitHub Actions 화면에서 수동 실행 가능 |
+| `main` 브랜치 push + 아래 경로 중 하나 이상 변경 | 자동 배포 실행 |
+| `workflow_dispatch` | `Actions -> Deploy Spring Backend to EC2 -> Run workflow`로 수동 실행 (경로 필터 영향 없음) |
 
-현재 브랜치가 `main`이 아니라면 workflow의 branches 값을 원하는 브랜치로 바꿔야 한다.
+자동 배포 대상 경로 (`paths` 허용 목록):
 
-예:
+```yml
+paths:
+  - "src/**"
+  - "build.gradle"
+  - "settings.gradle"
+  - "gradle/**"
+  - "gradlew"
+  - ".github/workflows/deploy-ec2.yml"
+```
+
+`README.md`, `docs/`, `tools/`, 백업 폴더 등 jar에 들어가지 않는 파일만 바뀐 push는 배포하지 않는다. 한 push에 코드와 문서가 섞여 있으면 배포한다. jar 빌드에 영향을 주는 새 파일/폴더를 추가하면 이 목록에도 추가한다.
+
+다른 브랜치에서 배포하려면 workflow의 branches 값을 바꾼다.
 
 ```yml
 on:
@@ -47,212 +249,107 @@ on:
       - refactor/#14
 ```
 
-## 3. GitHub Secrets 설정
+workflow 단계:
 
-GitHub repository에서 아래 위치로 이동한다.
-
-```txt
-Settings -> Secrets and variables -> Actions -> New repository secret
-```
-
-아래 값을 추가한다.
-
-| Secret 이름 | 예시 | 설명 |
-|---|---|---|
-| `EC2_HOST` | `13.124.12.34` | EC2 Public IP 또는 도메인 |
-| `EC2_USERNAME` | `ubuntu` | EC2 접속 사용자명 |
-| `EC2_SSH_KEY` | `-----BEGIN OPENSSH PRIVATE KEY-----...` | EC2 접속용 private key 전체 내용 |
+1. Java 21(temurin) 설정 후 `./gradlew clean bootJar -x test`
+2. `EC2_SSH_KEY`로 jar를 `/tmp/doody-backend.jar`에 업로드
+3. EC2에서 `doody` 사용자 생성(없을 때), jar를 `/opt/doody/app.jar`로 이동
+4. 시크릿으로 `/opt/doody/.env` 작성 (9장 참고, `chmod 600`)
+5. `/etc/systemd/system/doody-backend.service` 작성 후 `systemctl restart doody-backend`
 
 주의:
 
-- `EC2_SSH_KEY`에는 `.pem` 파일 내용을 그대로 넣는다.
-- private key는 코드에 커밋하면 안 된다.
-- EC2에 IAM Role을 붙였으므로 GitHub Secrets에 AWS Access Key는 넣지 않는다.
+- 코드 변경 없이 **시크릿만 바꾼 경우**에는 push가 없으므로 수동 실행해야 서버 `.env`에 반영된다.
+- 경로 필터에 걸려 배포되지 않았는데 배포가 필요하면 수동 실행한다.
+- `paths`와 `paths-ignore`는 함께 쓸 수 없다.
 
-## 4. EC2 최초 1회 준비
+## 9. 서버 환경변수 (`/opt/doody/.env`)
 
-EC2에 SSH 접속한다.
-
-```bash
-ssh -i key.pem ubuntu@EC2_PUBLIC_IP
-```
-
-### 4-1. Java 21 설치
-
-Ubuntu 기준:
-
-```bash
-sudo apt update
-sudo apt install -y openjdk-21-jdk
-java -version
-```
-
-### 4-2. 실행 사용자 생성
-
-```bash
-sudo useradd -r -s /usr/sbin/nologin doody || true
-sudo mkdir -p /opt/doody
-sudo chown -R doody:doody /opt/doody
-```
-
-### 4-3. 환경변수 파일 생성
-
-```bash
-sudo nano /opt/doody/.env
-```
-
-아래 값을 실제 값으로 입력한다.
+workflow가 배포할 때마다 아래 내용으로 덮어쓴다. **실제 값은 GitHub Secrets에만 두고 문서와 코드에는 적지 않는다.** 서버에서 `.env`를 직접 고쳐도 다음 배포 때 사라지므로, 값 변경은 항상 시크릿에서 한다.
 
 ```env
 SPRING_PROFILES_ACTIVE=prod
-DB_HOST=your-db-host
-DB_NAME=your-db-name
-DB_USERNAME=your-db-username
-DB_PASSWORD=your-db-password
-AI_ENGINE_BASE_URL=http://your-ai-engine-url
-AWS_REGION=ap-northeast-2
-S3_BUCKET=your-s3-bucket
-S3_PUBLIC_BASE_URL=
+DB_HOST=<RDS 엔드포인트>
+DB_NAME=doody
+DB_USERNAME=<RDS 마스터 사용자>
+DB_PASSWORD=<RDS 마스터 암호>
+AI_ENGINE_BASE_URL=<AI 엔진 주소>
+AWS_REGION=ap-southeast-2
+S3_BUCKET=doody-evidence
+S3_PUBLIC_BASE_URL=https://d20ic6nyseo37c.cloudfront.net
 HANA_AUTONOMY_URL=https://www.hanafn.com
 HANA_CONNECTION_URL=https://www.hanafn.com
 ```
 
-권한 설정:
+| 변수 | 사용처 (`application-prod.yml`) |
+|---|---|
+| `SPRING_PROFILES_ACTIVE` | workflow에 `prod`로 고정 |
+| `DB_HOST`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | `spring.datasource.*` (`sslmode=require`) |
+| `AI_ENGINE_BASE_URL` | `ai.engine.base-url` |
+| `AWS_REGION` | `cloud.aws.region.static` |
+| `S3_BUCKET` | `cloud.aws.s3.bucket` |
+| `S3_PUBLIC_BASE_URL` | `cloud.aws.s3.public-base-url` (이미지 URL 기준 주소) |
+| `HANA_AUTONOMY_URL`, `HANA_CONNECTION_URL` | `hana.finance.*` |
 
-```bash
-sudo chown doody:doody /opt/doody/.env
-sudo chmod 600 /opt/doody/.env
-```
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`는 넣지 않는다. S3 권한은 EC2 IAM Role이 담당한다.
 
-EC2에서는 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 넣지 않는다.  
-S3 권한은 EC2에 연결된 IAM Role이 담당한다.
+새 환경변수를 추가할 때는 세 곳을 함께 수정한다.
 
-### 4-4. systemd 서비스 생성
+1. `application-prod.yml`에 `${NEW_VAR}` 참조 추가
+2. GitHub Secrets에 `NEW_VAR` 등록
+3. `deploy-ec2.yml`의 `ENVEOF` 블록에 `NEW_VAR=${{ secrets.NEW_VAR }}` 추가
 
-```bash
-sudo nano /etc/systemd/system/doody-backend.service
-```
+예정: 로그인 작업 시 `JWT_SECRET`, `GOOGLE_CLIENT_IDS`, `REDIS_HOST`(`localhost`)를 위 절차로 추가한다.
 
-아래 내용을 넣는다.
-
-```ini
-[Unit]
-Description=Doody Spring Backend
-After=network.target
-
-[Service]
-User=doody
-WorkingDirectory=/opt/doody
-EnvironmentFile=/opt/doody/.env
-ExecStart=/usr/bin/java -jar /opt/doody/app.jar
-SuccessExitStatus=143
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-서비스 등록:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable doody-backend
-```
-
-처음에는 jar가 없어서 start가 실패할 수 있다. GitHub Actions가 첫 배포로 `/opt/doody/app.jar`를 올린 뒤 재시작한다.
-
-## 5. EC2 IAM Role 확인
-
-EC2 인스턴스에 아래 Role이 붙어 있어야 한다.
-
-```txt
-doody-app-ec2-role
-```
-
-Role에는 아래 정책이 연결되어 있어야 한다.
-
-```txt
-DoodyMissionEvidenceS3Policy
-```
-
-권장 정책:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "DoodyMissionEvidenceUpload",
-      "Effect": "Allow",
-      "Action": [
-        "s3:PutObject",
-        "s3:GetObject"
-      ],
-      "Resource": "arn:aws:s3:::YOUR_BUCKET_NAME/doody/mission/*"
-    }
-  ]
-}
-```
-
-`YOUR_BUCKET_NAME`은 실제 `S3_BUCKET` 값으로 바꾼다.
-
-## 6. 배포 실행
-
-로컬에서 변경사항을 push한다.
-
-```bash
-git add .
-git commit -m "feat: add github actions ec2 deploy"
-git push origin main
-```
-
-GitHub에서 확인:
-
-```txt
-Repository -> Actions -> Deploy Spring Backend to EC2
-```
-
-## 7. 배포 확인
-
-EC2에서 서비스 상태 확인:
+## 10. 배포 확인
 
 ```bash
 sudo systemctl status doody-backend --no-pager
-```
-
-로그 확인:
-
-```bash
-journalctl -u doody-backend -f
-```
-
-헬스 체크:
-
-```bash
+journalctl -u doody-backend -n 100 --no-pager -l
 curl http://localhost:8080/api/health
+sudo grep S3_PUBLIC_BASE_URL /opt/doody/.env
 ```
 
-외부에서 확인:
+외부:
 
 ```bash
-curl http://EC2_PUBLIC_IP:8080/api/health
+curl http://3.24.77.23/api/health
 ```
 
-## 8. 자주 나는 오류
+## 11. 로컬에서 서버 접속 (Windows)
+
+```powershell
+ssh -i "$HOME\.ssh\doody-key.pem" ubuntu@3.24.77.23
+```
+
+`UNPROTECTED PRIVATE KEY FILE` / `bad permissions`가 나오면 키 파일 권한을 본인만 읽을 수 있게 정리한다. 경고에 표시된 다른 사용자/그룹도 함께 제거한다.
+
+```powershell
+icacls "$HOME\.ssh\doody-key.pem" /inheritance:r /grant:r "$($env:USERNAME):(R)"
+```
+
+키 파일 없이 접속해야 하면 콘솔의 `EC2 -> 인스턴스 -> 연결 -> EC2 Instance Connect`를 사용한다.
+
+## 12. 자주 나는 오류
 
 | 증상 | 원인 | 해결 |
 |---|---|---|
-| `Permission denied (publickey)` | GitHub Secret의 SSH key 오류 | `EC2_SSH_KEY`에 private key 전체 내용 확인 |
-| `systemctl restart doody-backend` 실패 | systemd 서비스 미생성 | `/etc/systemd/system/doody-backend.service` 생성 |
-| DB 연결 실패 | `.env` DB 값 오류 또는 보안그룹 문제 | DB 환경변수와 RDS inbound 확인 |
-| S3 업로드 실패 | EC2 Role 또는 S3 정책 문제 | `doody-app-ec2-role`과 `DoodyMissionEvidenceS3Policy` 확인 |
-| 외부 접속 안 됨 | EC2 보안그룹 8080 미개방 | inbound rule에 TCP 8080 허용 |
+| Actions `Load key ... error in libcrypto` | `EC2_SSH_KEY` 내용이 깨짐 | 7장 방법으로 파일째 다시 등록 |
+| Actions `Permission denied (publickey)` | 사용자명 오타 또는 키 불일치 | 서버에서 `sudo journalctl -u ssh --since "30 min ago"` 확인. `Invalid user xxx`면 `EC2_USERNAME` 수정 |
+| `Unit doody-backend.service could not be found` | 배포가 아직 성공하지 않음 | Actions 실행 결과 확인 |
+| DB 연결 실패 | `.env` DB 값 오류 또는 보안그룹 문제 | `nc -zv <RDS_ENDPOINT> 5432`, `doody-rds-sg` 소스 확인 |
+| `database "doody" does not exist` | RDS 초기 DB 이름 누락 | RDS에서 DB 생성 또는 재구성 |
+| S3 업로드 실패 | IAM Role 미연결 또는 정책의 버킷명 불일치 | 인스턴스의 IAM 역할과 정책 Resource 확인 |
+| 이미지 URL `AccessDenied` | `S3_PUBLIC_BASE_URL` 미설정 (S3 직접 주소 반환) | CloudFront 주소로 설정 후 재배포 |
+| CloudFront `AccessDenied` | 버킷 정책에 CloudFront 허용 없음 | 3-2 버킷 정책 확인 |
+| 외부에서 접속 안 됨 | Nginx 설정 또는 보안그룹 80 미개방 | `sudo nginx -t`, `doody-ec2-sg` 확인 |
+| 프론트(HTTPS 웹)에서 API 호출 차단 | Mixed Content (HTTPS 페이지 → HTTP API) | DuckDNS 등으로 HTTPS 적용 필요 |
 
-## 9. 운영 권장사항
+## 13. 운영 메모
 
-- `AmazonS3FullAccess`는 제거하고 `DoodyMissionEvidenceS3Policy`만 유지한다.
-- 운영에서는 8080을 직접 열기보다 Nginx + HTTPS를 앞단에 두는 것을 권장한다.
-- GitHub Secrets에는 AWS Access Key를 넣지 않는다.
-- EC2의 `.env` 파일은 `chmod 600`으로 보호한다.
-
+- 앱 클라이언트는 HTTP 허용 설정이 필요하다 (Android `usesCleartextTraffic`, iOS ATS 예외).
+- 로그인(JWT)을 실제 사용자에게 제공하려면 HTTPS가 필요하다. 필요해지면 DuckDNS 무료 서브도메인 + `certbot --nginx`로 적용한다.
+- 보안 업데이트는 `unattended-upgrades`로 자동 설치된다 (`systemctl is-enabled unattended-upgrades`).
+- 루트 계정과 IAM 사용자 모두 MFA를 사용하고, 월 예산 알림을 유지한다.
+- 사용하지 않는 기간에는 EC2/RDS를 중지할 수 있다. RDS는 중지 7일 후 자동으로 다시 시작된다.
+- 프로젝트 종료 시 정리 순서: CloudFront 비활성화·삭제 → RDS 삭제(삭제 방지 해제) → EC2 종료 → 탄력적 IP 릴리스 → S3 비우고 삭제 → IAM 역할 삭제.
