@@ -1,7 +1,7 @@
 # AWS + GitHub Actions 백엔드 배포 가이드
 
 최초 작성: 2026-07-04  
-전면 개정: 2026-11-23 (AWS 재구축, 시드니 리전, Nginx, CloudFront 추가)  
+전면 개정: 2026-11-23 (AWS 재구축, 시드니 리전, Nginx, CloudFront, HTTPS 추가)  
 대상: Spring Boot 백엔드 jar 배포 (포트폴리오용, 정식 출시 계획 없음)
 
 ## 1. 전체 구성
@@ -9,8 +9,10 @@
 | 항목 | 값 |
 |---|---|
 | 리전 | `ap-southeast-2` (아시아 태평양 · 시드니) |
-| API 주소 | `http://3.24.77.23/api` (Nginx 80 → Spring 8080) |
-| Swagger | `http://3.24.77.23/swagger-ui/index.html` |
+| API 주소 | `https://doody-api.duckdns.org/api` (Nginx 443 → Spring 8080) |
+| Swagger | `https://doody-api.duckdns.org/swagger-ui/index.html` |
+| 도메인 | `doody-api.duckdns.org` (DuckDNS 무료 서브도메인 → `3.24.77.23`) |
+| 인증서 | Let's Encrypt (certbot, 90일, 자동 갱신) |
 | 이미지 주소 | `https://d20ic6nyseo37c.cloudfront.net/doody/mission/...` |
 | EC2 | `doody-backend`, Ubuntu 24.04, t3.small, 탄력적 IP `3.24.77.23` |
 | RDS | `doody-db`, PostgreSQL, db.t4g.micro, 초기 DB `doody`, 퍼블릭 액세스 없음 |
@@ -22,7 +24,7 @@
 
 ```mermaid
 flowchart LR
-    Client[앱 / 브라우저] -- "HTTP :80" --> Nginx
+    Client[앱 / 브라우저] -- "HTTPS :443 (80은 443으로 리다이렉트)" --> Nginx
     subgraph EC2[EC2 doody-backend]
         Nginx -- "127.0.0.1:8080" --> Spring[Spring Boot]
         Spring --> Redis[(Redis)]
@@ -53,7 +55,7 @@ sequenceDiagram
 | `doody-ec2-sg` | SSH 22, HTTP 80, HTTPS 443 (모두 `0.0.0.0/0`) | GitHub Actions IP가 고정이 아니어서 22를 전체 허용. 접속은 키 인증만 가능 |
 | `doody-rds-sg` | PostgreSQL 5432, 소스 = `doody-ec2-sg` | 절대 `0.0.0.0/0`으로 열지 않는다 |
 
-8080은 열지 않는다. 모든 요청은 Nginx(80)를 거친다.
+8080은 열지 않는다. 모든 요청은 Nginx(443, 80은 리다이렉트와 인증서 발급·갱신용)를 거친다.
 
 ## 3. S3 + CloudFront
 
@@ -183,6 +185,47 @@ sudo nginx -t && sudo systemctl reload nginx
 
 - `client_max_body_size 20M`: 증빙 이미지 업로드 허용 크기
 - `proxy_read_timeout 120s`: AI 엔진 응답 지연 대비
+- `X-Forwarded-Proto`: Spring이 원래 요청이 HTTPS였는지 알 수 있게 전달 (6-4의 `forward-headers-strategy`와 짝)
+
+### 6-4. HTTPS (DuckDNS + Let's Encrypt)
+
+도메인을 구매하지 않고 DuckDNS 무료 서브도메인에 Let's Encrypt 인증서를 붙인다.
+
+1. https://www.duckdns.org 에 로그인 → 서브도메인 `doody-api` 추가
+2. 목록의 **current ip**를 `3.24.77.23`으로 바꾸고 **update ip** (기본값은 내 PC IP이므로 반드시 변경)
+3. DNS 확인: `nslookup doody-api.duckdns.org` → `3.24.77.23`
+
+탄력적 IP라 IP가 바뀌지 않으므로 DuckDNS 자동 갱신 스크립트는 설치하지 않는다. DuckDNS token은 공유하지 않는다.
+
+서버에서 Nginx `server_name`을 도메인으로 바꾸고 인증서를 발급한다.
+
+```bash
+sudo sed -i 's/server_name _;/server_name doody-api.duckdns.org;/' /etc/nginx/sites-available/doody
+sudo nginx -t && sudo systemctl reload nginx
+
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d doody-api.duckdns.org   # 이메일 입력, 약관 동의, 리다이렉트 선택
+sudo certbot renew --dry-run                     # 자동 갱신 테스트
+```
+
+certbot이 `/etc/nginx/sites-available/doody`를 직접 수정한다.
+
+- `listen 443 ssl`과 인증서 경로(`/etc/letsencrypt/live/doody-api.duckdns.org/`) 추가
+- 80 포트 요청은 `https://`로 301 리다이렉트
+- **도메인이 아닌 Host(예: `http://3.24.77.23`)로 들어온 요청은 404**를 반환한다. API는 반드시 도메인으로 호출한다.
+
+인증서는 90일짜리이며 certbot이 설치한 systemd timer가 만료 전에 자동 갱신한다 (`systemctl list-timers | grep certbot`).
+
+Spring 쪽에는 `application-prod.yml`에 아래 설정이 있어야 Nginx가 넘겨 준 `X-Forwarded-*` 헤더를 읽는다. 없으면 Swagger가 서버 주소를 `http://`로 만들어 HTTPS 페이지에서 Try it out이 막힌다.
+
+```yaml
+server:
+  forward-headers-strategy: framework
+```
+
+확인: `curl -s https://doody-api.duckdns.org/v3/api-docs | grep -o '"servers":\[[^]]*\]'` → `https://doody-api.duckdns.org`
+
+새 서버로 옮기거나 IP가 바뀌면 DuckDNS의 current ip를 새 IP로 바꾸고, 새 서버에서 6-3 → 6-4를 다시 실행한다.
 
 ## 7. GitHub Secrets
 
@@ -313,7 +356,13 @@ sudo grep S3_PUBLIC_BASE_URL /opt/doody/.env
 외부:
 
 ```bash
-curl http://3.24.77.23/api/health
+curl https://doody-api.duckdns.org/api/health
+```
+
+인증서 만료일:
+
+```bash
+sudo certbot certificates
 ```
 
 ## 11. 로컬에서 서버 접속 (Windows)
@@ -342,13 +391,17 @@ icacls "$HOME\.ssh\doody-key.pem" /inheritance:r /grant:r "$($env:USERNAME):(R)"
 | S3 업로드 실패 | IAM Role 미연결 또는 정책의 버킷명 불일치 | 인스턴스의 IAM 역할과 정책 Resource 확인 |
 | 이미지 URL `AccessDenied` | `S3_PUBLIC_BASE_URL` 미설정 (S3 직접 주소 반환) | CloudFront 주소로 설정 후 재배포 |
 | CloudFront `AccessDenied` | 버킷 정책에 CloudFront 허용 없음 | 3-2 버킷 정책 확인 |
-| 외부에서 접속 안 됨 | Nginx 설정 또는 보안그룹 80 미개방 | `sudo nginx -t`, `doody-ec2-sg` 확인 |
-| 프론트(HTTPS 웹)에서 API 호출 차단 | Mixed Content (HTTPS 페이지 → HTTP API) | DuckDNS 등으로 HTTPS 적용 필요 |
+| 외부에서 접속 안 됨 | Nginx 설정 또는 보안그룹 80/443 미개방 | `sudo nginx -t`, `doody-ec2-sg` 확인 |
+| `http://3.24.77.23/...` 404 | certbot 설정 후 도메인 Host만 처리 | `https://doody-api.duckdns.org`로 호출 |
+| 도메인 접속 안 됨 (`NXDOMAIN`, 다른 IP) | DuckDNS current ip 불일치 | `nslookup doody-api.duckdns.org` 후 DuckDNS에서 IP 수정 |
+| certbot 발급 실패 | DNS 미반영, 80 포트 차단, `server_name` 불일치 | DNS·보안그룹·Nginx `server_name` 확인 후 재시도 |
+| Swagger Try it out 실패 (Mixed Content) | Spring이 HTTPS를 인식하지 못함 | `server.forward-headers-strategy: framework` 확인 |
+| 프론트(HTTPS 웹)에서 API 호출 차단 | API를 `http://`로 호출 | API 주소를 `https://doody-api.duckdns.org/api`로 변경 |
 
 ## 13. 운영 메모
 
-- 앱 클라이언트는 HTTP 허용 설정이 필요하다 (Android `usesCleartextTraffic`, iOS ATS 예외).
-- 로그인(JWT)을 실제 사용자에게 제공하려면 HTTPS가 필요하다. 필요해지면 DuckDNS 무료 서브도메인 + `certbot --nginx`로 적용한다.
+- 클라이언트 API 주소는 `https://doody-api.duckdns.org/api`. HTTPS이므로 앱의 HTTP 허용 설정(Android `usesCleartextTraffic`, iOS ATS 예외)은 필요 없다.
+- DuckDNS는 외부 무료 서비스라 장애 시 도메인 접속이 안 될 수 있다. 정식 서비스가 필요해지면 도메인을 구매해 6-4를 해당 도메인으로 다시 실행한다.
 - 보안 업데이트는 `unattended-upgrades`로 자동 설치된다 (`systemctl is-enabled unattended-upgrades`).
 - 루트 계정과 IAM 사용자 모두 MFA를 사용하고, 월 예산 알림을 유지한다.
 - 사용하지 않는 기간에는 EC2/RDS를 중지할 수 있다. RDS는 중지 7일 후 자동으로 다시 시작된다.
